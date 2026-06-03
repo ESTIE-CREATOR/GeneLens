@@ -161,7 +161,7 @@ def plot_pca(
     scaler = StandardScaler()
     data_scaled = scaler.fit_transform(data)
 
-    n_components = min(3, len(all_cols), data_scaled.shape[1])
+    n_components = min(3, data_scaled.shape[0], data_scaled.shape[1])
     if n_components < 2:
         return None
     pca = PCA(n_components=n_components)

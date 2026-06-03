@@ -34,16 +34,17 @@ def run_ml_classification(
     Returns:
         dict with: accuracy, std, feature_importances, roc_fig, cv_scores
     """
-    # Select top DE genes as features
+    # Select top DE genes as features, filtering to genes present in df
     sig_genes = results[results["significance"] != "Not significant"]["Gene"].head(top_n_features).tolist()
     if len(sig_genes) < 5:
         sig_genes = results["Gene"].head(top_n_features).tolist()
+    sig_genes = [g for g in sig_genes if g in df.index]
 
     all_cols = control_cols + treated_cols
     labels = [0] * len(control_cols) + [1] * len(treated_cols)
 
     # Feature matrix: log2-transformed expression
-    feature_df = np.log2(df.loc[sig_genes, all_cols].values.T + 1)
+    feature_df = np.log2(df.loc[sig_genes, all_cols].values.T.astype(float) + 1)
     X = feature_df
     y = np.array(labels)
 
@@ -58,9 +59,17 @@ def run_ml_classification(
         ))
     ])
 
-    # Cross-validation
-    cv = StratifiedKFold(n_splits=min(n_splits, len(y) // 2), shuffle=True, random_state=random_state)
-    cv_scores = cross_val_score(pipeline, X, y, cv=cv, scoring="roc_auc")
+    # Cross-validation — requires at least 2 samples per class
+    n_cls_min = min(len(control_cols), len(treated_cols))
+    if n_cls_min >= 2:
+        cv = StratifiedKFold(
+            n_splits=min(n_splits, n_cls_min),
+            shuffle=True,
+            random_state=random_state,
+        )
+        cv_scores = cross_val_score(pipeline, X, y, cv=cv, scoring="roc_auc")
+    else:
+        cv_scores = np.array([float("nan")])
 
     # Fit on all data for feature importance + ROC
     pipeline.fit(X, y)
@@ -82,8 +91,8 @@ def run_ml_classification(
     importance_fig = _plot_feature_importance(feature_importance_df.head(20))
 
     return {
-        "accuracy": cv_scores.mean(),
-        "std": cv_scores.std(),
+        "accuracy": float(np.nanmean(cv_scores)),
+        "std": float(np.nanstd(cv_scores)),
         "cv_scores": cv_scores,
         "roc_auc": roc_auc,
         "feature_importances": feature_importance_df,

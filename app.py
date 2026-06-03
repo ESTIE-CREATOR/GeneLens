@@ -336,23 +336,23 @@ st.markdown('<div class="section-header">DIFFERENTIAL EXPRESSION</div>', unsafe_
 col_v, col_b = st.columns([2, 1])
 with col_v:
     fig_volcano = plot_volcano(results, pval_threshold, fc_threshold, label_top_n)
-    st.plotly_chart(fig_volcano, use_container_width=True)
+    st.plotly_chart(fig_volcano, width='stretch')
 with col_b:
     fig_bar = plot_deg_bar(results)
-    st.plotly_chart(fig_bar, use_container_width=True)
+    st.plotly_chart(fig_bar, width='stretch')
 
 
 # ── Heatmap ───────────────────────────────────────────────────────────────────
 st.markdown('<div class="section-header">HEATMAP</div>', unsafe_allow_html=True)
 fig_heatmap = plot_heatmap(df, results, control_cols, treated_cols, top_n=top_n_heatmap)
-st.plotly_chart(fig_heatmap, use_container_width=True)
+st.plotly_chart(fig_heatmap, width='stretch')
 
 
 # ── PCA ───────────────────────────────────────────────────────────────────────
 st.markdown('<div class="section-header">PCA — SAMPLE CLUSTERING</div>', unsafe_allow_html=True)
 fig_pca = plot_pca(df, control_cols, treated_cols)
 if fig_pca is not None:
-    st.plotly_chart(fig_pca, use_container_width=True)
+    st.plotly_chart(fig_pca, width='stretch')
 else:
     st.info("PCA requires at least 2 samples in each group.")
 
@@ -365,9 +365,9 @@ with st.spinner("Training Random Forest classifier..."):
 
 ml1, ml2 = st.columns(2)
 with ml1:
-    st.plotly_chart(ml_results["roc_fig"], use_container_width=True)
+    st.plotly_chart(ml_results["roc_fig"], width='stretch')
 with ml2:
-    st.plotly_chart(ml_results["importance_fig"], use_container_width=True)
+    st.plotly_chart(ml_results["importance_fig"], width='stretch')
 
 st.markdown(f"""
 <div style='text-align:center; padding:0.8rem; background:rgba(124,106,247,0.08); border-radius:8px; font-family:Space Mono,monospace; color:#D1D5DB; font-size:0.85rem;'>
@@ -388,7 +388,7 @@ st.dataframe(
         "pvalue": "{:.2e}",
         "padj": "{:.2e}",
     }).background_gradient(subset=["log2FoldChange"], cmap="RdBu_r"),
-    use_container_width=True,
+    width='stretch',
     height=380
 )
 
