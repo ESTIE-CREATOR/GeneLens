@@ -161,7 +161,10 @@ def plot_pca(
     scaler = StandardScaler()
     data_scaled = scaler.fit_transform(data)
 
-    pca = PCA(n_components=min(3, len(all_cols) - 1))
+    n_components = min(3, len(all_cols), data_scaled.shape[1])
+    if n_components < 2:
+        return None
+    pca = PCA(n_components=n_components)
     coords = pca.fit_transform(data_scaled)
     var_exp = pca.explained_variance_ratio_ * 100
 

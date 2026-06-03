@@ -351,7 +351,10 @@ st.plotly_chart(fig_heatmap, use_container_width=True)
 # ── PCA ───────────────────────────────────────────────────────────────────────
 st.markdown('<div class="section-header">PCA — SAMPLE CLUSTERING</div>', unsafe_allow_html=True)
 fig_pca = plot_pca(df, control_cols, treated_cols)
-st.plotly_chart(fig_pca, use_container_width=True)
+if fig_pca is not None:
+    st.plotly_chart(fig_pca, use_container_width=True)
+else:
+    st.info("PCA requires at least 2 samples in each group.")
 
 
 # ── ML Classification ─────────────────────────────────────────────────────────
