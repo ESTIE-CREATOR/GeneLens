@@ -109,7 +109,7 @@ def plot_heatmap(
     zscored = ((log_subset.T - log_subset.mean(axis=1)) / log_subset.std(axis=1).clip(0.01)).T
 
     # Annotation: significance marker
-    sig_map = results.set_index("Gene")["significance"]
+    sig_map = results.drop_duplicates(subset="Gene").set_index("Gene")["significance"]
     gene_labels = [
         f"▲ {g}" if sig_map.get(g) == "Upregulated"
         else f"▼ {g}" if sig_map.get(g) == "Downregulated"
