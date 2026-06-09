@@ -46,6 +46,7 @@ from utils.de_analysis import run_differential_expression, get_summary_stats, ge
 from utils.visualisations import plot_volcano, plot_heatmap, plot_pca, plot_deg_bar
 from utils.ml_classifier import run_ml_classification
 from utils.ai_interpretation import generate_ai_interpretation
+from utils.pathway_enrichment import run_pathway_enrichment, plot_go_bar, plot_kegg_bar
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -435,6 +436,52 @@ st.download_button(
     file_name="geneinsight_de_results.csv",
     mime="text/csv"
 )
+
+
+# ── Pathway Enrichment ───────────────────────────────────────────────────────
+st.markdown('<div class="section-header">PATHWAY ENRICHMENT — GO & KEGG</div>', unsafe_allow_html=True)
+
+with st.spinner("Running GO and KEGG enrichment via Enrichr..."):
+    enr_results = run_pathway_enrichment(results)
+
+if enr_results["success"]:
+    st.success(
+        f"✅ Enrichment complete — {enr_results['n_de_genes']} DE genes analysed "
+        f"({enr_results['n_up']} up, {enr_results['n_down']} down)",
+        icon="🧬"
+    )
+
+    tab_go, tab_kegg = st.tabs(["GO Biological Process", "KEGG Pathways"])
+
+    with tab_go:
+        if not enr_results["go_results"].empty:
+            fig_go = plot_go_bar(enr_results["go_results"])
+            if fig_go:
+                st.plotly_chart(fig_go, width='stretch')
+            go_display = enr_results["go_results"][["Term", "Overlap", "Adjusted P-value", "Genes"]].copy()
+            go_display["Adjusted P-value"] = go_display["Adjusted P-value"].map("{:.2e}".format)
+            st.dataframe(go_display, use_container_width=True, height=320)
+        else:
+            st.info("No significant GO terms found at padj < 0.05 for this gene set.")
+
+    with tab_kegg:
+        if not enr_results["kegg_results"].empty:
+            fig_kegg = plot_kegg_bar(enr_results["kegg_results"])
+            if fig_kegg:
+                st.plotly_chart(fig_kegg, width='stretch')
+            kegg_display = enr_results["kegg_results"][["Term", "Overlap", "Adjusted P-value", "Genes"]].copy()
+            kegg_display["Adjusted P-value"] = kegg_display["Adjusted P-value"].map("{:.2e}".format)
+            st.dataframe(kegg_display, use_container_width=True, height=320)
+        else:
+            st.info("No significant KEGG pathways found at padj < 0.05 for this gene set.")
+
+else:
+    st.info(
+        f"ℹ️ Pathway enrichment requires an internet connection to query the Enrichr database. "
+        f"Error: {enr_results.get('error', 'Unknown error')}. "
+        f"The rest of the analysis above is fully available offline.",
+        icon="🌐"
+    )
 
 
 # ── AI Interpretation ─────────────────────────────────────────────────────────
