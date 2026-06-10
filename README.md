@@ -3,12 +3,11 @@
 
 A complete bioinformatics pipeline — from raw RNA-seq count matrices to pathway-level biological interpretation.
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://YOUR-STREAMLIT-URL.streamlit.app)
-
+<img width="1916" height="950" alt="Image" src="https://github.com/user-attachments/assets/89376071-7888-4943-bb36-f86e9ba0c4f0" />
 ---
 
 ## 🔬 Live App
-👉 **[YOUR-STREAMLIT-URL.streamlit.app](https://YOUR-STREAMLIT-URL.streamlit.app)**
+👉 **[https://genelens.streamlit.app/](https://genelens.streamlit.app/)**
 
 ---
 
@@ -38,10 +37,10 @@ A complete bioinformatics pipeline — from raw RNA-seq count matrices to pathwa
 
 <!-- Drag and drop your COVID volcano screenshot into a GitHub issue or README editor,
      then replace the URL below with the link GitHub generates -->
-![COVID-19 Volcano Plot](https://github.com/user-attachments/assets/REPLACE-WITH-COVID-VOLCANO-URL)
+<img width="959" height="474" alt="Image" src="https://github.com/user-attachments/assets/c3f17865-3161-43f2-b139-e6a2688458e9" />
 *3,405 upregulated · 2,250 downregulated*
 
-![COVID-19 PCA](https://github.com/user-attachments/assets/REPLACE-WITH-COVID-PCA-URL)
+<img width="959" height="476" alt="Image" src="https://github.com/user-attachments/assets/fd47d0de-f499-4f62-9faf-d3c58d4ca24a" />
 *Clean separation of COVID-19 patients from healthy controls on PC1*
 
 **Key findings:**
@@ -56,13 +55,13 @@ A complete bioinformatics pipeline — from raw RNA-seq count matrices to pathwa
 **Scale:** 226 curated genes × 13 samples | 5 Normal vs. 8 T2DM liver biopsies
 
 <!-- Replace URLs below with your actual screenshot attachment links -->
-![T2DM Volcano Plot](https://github.com/user-attachments/assets/REPLACE-WITH-T2DM-VOLCANO-URL)
+<img width="1918" height="877" alt="Image" src="https://github.com/user-attachments/assets/d2528e19-c859-4b4f-a5ef-e8ab85319d89" />
 *SOD2, CAT, GPX1, GSR downregulated — antioxidant enzymes from thesis research*
 
-![T2DM GO Enrichment](https://github.com/user-attachments/assets/REPLACE-WITH-T2DM-GO-URL)
+<img width="1919" height="943" alt="Image" src="https://github.com/user-attachments/assets/1f415041-4918-4d2a-932d-954a9172ff04" />
 *Glutathione metabolic process — most significantly depleted GO term*
 
-![T2DM KEGG Pathways](https://github.com/user-attachments/assets/REPLACE-WITH-T2DM-KEGG-URL)
+<img width="1919" height="948" alt="Image" src="https://github.com/user-attachments/assets/e79afb9c-c05f-4051-a77d-dbd09504edc8" />
 *Insulin signalling (p=1.86e-08) · Glutathione metabolism · Type II diabetes mellitus*
 
 **Key findings:**
@@ -154,12 +153,12 @@ BSc Biochemistry — First Class Honours, University of Medical Sciences, Nigeri
 
 A complete bioinformatics pipeline — from raw RNA-seq count matrices to pathway-level biological interpretation.
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://YOUR-STREAMLIT-URL.streamlit.app)
+<img width="1916" height="950" alt="Image" src="https://github.com/user-attachments/assets/89376071-7888-4943-bb36-f86e9ba0c4f0" />
 
 ---
 
 ## 🔬 Live App
-👉 **[YOUR-STREAMLIT-URL.streamlit.app](https://YOUR-STREAMLIT-URL.streamlit.app)**
+👉 **[https://genelens.streamlit.app/](https://genelens.streamlit.app/)**
 
 ---
 
@@ -189,10 +188,10 @@ A complete bioinformatics pipeline — from raw RNA-seq count matrices to pathwa
 
 <!-- Drag and drop your COVID volcano screenshot into a GitHub issue or README editor,
      then replace the URL below with the link GitHub generates -->
-![COVID-19 Volcano Plot](https://github.com/user-attachments/assets/REPLACE-WITH-COVID-VOLCANO-URL)
+<img width="959" height="474" alt="Image" src="https://github.com/user-attachments/assets/c3f17865-3161-43f2-b139-e6a2688458e9" />
 *3,405 upregulated · 2,250 downregulated*
 
-![COVID-19 PCA](https://github.com/user-attachments/assets/REPLACE-WITH-COVID-PCA-URL)
+<img width="959" height="476" alt="Image" src="https://github.com/user-attachments/assets/fd47d0de-f499-4f62-9faf-d3c58d4ca24a" />
 *Clean separation of COVID-19 patients from healthy controls on PC1*
 
 **Key findings:**
@@ -207,13 +206,13 @@ A complete bioinformatics pipeline — from raw RNA-seq count matrices to pathwa
 **Scale:** 226 curated genes × 13 samples | 5 Normal vs. 8 T2DM liver biopsies
 
 <!-- Replace URLs below with your actual screenshot attachment links -->
-![T2DM Volcano Plot](https://github.com/user-attachments/assets/REPLACE-WITH-T2DM-VOLCANO-URL)
+<img width="1918" height="877" alt="Image" src="https://github.com/user-attachments/assets/d2528e19-c859-4b4f-a5ef-e8ab85319d89" />
 *SOD2, CAT, GPX1, GSR downregulated — antioxidant enzymes from thesis research*
 
-![T2DM GO Enrichment](https://github.com/user-attachments/assets/REPLACE-WITH-T2DM-GO-URL)
+<img width="1919" height="943" alt="Image" src="https://github.com/user-attachments/assets/1f415041-4918-4d2a-932d-954a9172ff04" />
 *Glutathione metabolic process — most significantly depleted GO term*
 
-![T2DM KEGG Pathways](https://github.com/user-attachments/assets/REPLACE-WITH-T2DM-KEGG-URL)
+<img width="1919" height="948" alt="Image" src="https://github.com/user-attachments/assets/e79afb9c-c05f-4051-a77d-dbd09504edc8" />
 *Insulin signalling (p=1.86e-08) · Glutathione metabolism · Type II diabetes mellitus*
 
 **Key findings:**
