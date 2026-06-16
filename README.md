@@ -4,10 +4,11 @@
 A complete bioinformatics pipeline — from raw RNA-seq count matrices to pathway-level biological interpretation.
 
 <img width="1919" height="949" alt="Image" src="https://github.com/user-attachments/assets/e5665890-5e5b-4216-9320-1a332603526f" />
+
 ---
 
 ## 🔬 Live App
-👉 **[https://genelens.streamlit.app/](https://genelens.streamlit.app/)**
+👉 **[genelens.streamlit.app](https://genelens.streamlit.app)**
 
 ---
 
@@ -29,14 +30,13 @@ A complete bioinformatics pipeline — from raw RNA-seq count matrices to pathwa
 
 ---
 
-## Validated on Real Published Datasets
+## Validated on Real Published Data
 
 ### Dataset 1 — COVID-19 PBMC RNA-seq (GSE152418, *Science* 2020)
 
 **Scale:** 60,683 genes × 34 samples | 17 COVID-19 patients vs. 17 healthy controls
 
-<!-- Drag and drop your COVID volcano screenshot into a GitHub issue or README editor,
-     then replace the URL below with the link GitHub generates -->
+<!-- Add your COVID volcano screenshot URL here -->
 <img width="959" height="474" alt="Image" src="https://github.com/user-attachments/assets/c3f17865-3161-43f2-b139-e6a2688458e9" />
 
 *3,405 upregulated · 2,250 downregulated*
@@ -52,14 +52,18 @@ A complete bioinformatics pipeline — from raw RNA-seq count matrices to pathwa
 
 ---
 
-### Dataset 2 — Type 2 Diabetes Liver (GSE15653, Pihlajamäki et al. 2009)
+### Dataset 2 — Type 2 Diabetes Liver — Workflow Demonstration
 
-**Scale:** 226 curated genes × 13 samples | 5 Normal vs. 8 T2DM liver biopsies
+**Purpose:** Demonstration of the full GeneLens analysis workflow and biological interpretation capabilities, connecting RNA-seq analysis to oxidative stress pathways studied in my undergraduate thesis.
 
-<!-- Replace URLs below with your actual screenshot attachment links -->
+**Structure:** 226 curated metabolic and oxidative stress genes × 13 samples | 5 Normal vs. 8 T2DM conditions
+
+**Note:** This dataset was constructed as a biologically informed demonstration using gene expression directions and magnitudes derived from published T2DM transcriptomics literature (including Pihlajamäki et al. 2009, GSE15653). It is not a direct download from GEO — it is a curated demonstration dataset designed to illustrate the GeneLens pipeline on biologically relevant gene sets.
+
+<!-- Add your T2DM screenshots here -->
 <img width="1918" height="877" alt="Image" src="https://github.com/user-attachments/assets/d2528e19-c859-4b4f-a5ef-e8ab85319d89" />
 
-*SOD2, CAT, GPX1, GSR downregulated — antioxidant enzymes from thesis research*
+*GPX1, GCLM, GSR downregulated — antioxidant enzymes from thesis research*
 
 <img width="1919" height="943" alt="Image" src="https://github.com/user-attachments/assets/1f415041-4918-4d2a-932d-954a9172ff04" />
 
@@ -67,16 +71,15 @@ A complete bioinformatics pipeline — from raw RNA-seq count matrices to pathwa
 
 <img width="1919" height="948" alt="Image" src="https://github.com/user-attachments/assets/e79afb9c-c05f-4051-a77d-dbd09504edc8" />
 
-*Insulin signalling (p=1.86e-08) · Glutathione metabolism · Type II diabetes mellitus*
 
-**Key findings:**
-- `GPX1`, `GCLM`, `GSR` significantly downregulated (padj < 0.05) — antioxidant suppression
+**Key findings from demonstration:**
+- `GPX1`, `GCLM`, `GSR` downregulated — antioxidant suppression
 - `SOD2`, `CAT` strong downward trends — consistent with thesis biochemical findings
 - `CYP2E1` upregulated → ROS generation
 - **Top GO term:** Glucose homeostasis (GO:0042593, p=6.00e-07)
 - **Top KEGG pathway:** Insulin signalling (p=1.86e-08)
 
-> 📁 Full research case study: [genelens-t2dm-study](https://github.com/ESTIE-CREATOR/genelens-t2dm-study)
+> 📁 Full case study and methods: [genelens-t2dm-study](https://github.com/ESTIE-CREATOR/genelens-t2dm-study)
 
 ---
 
@@ -88,15 +91,15 @@ A complete bioinformatics pipeline — from raw RNA-seq count matrices to pathwa
 | `.tsv` | Tab-separated count matrix |
 | `.txt` | GEO Series Matrix files — auto-parsed |
 
-**Structure:** rows = genes, columns = samples, first column = gene names.
+**Expected structure:** rows = genes, columns = samples, first column = gene names.
 
 ---
 
 ## How to Run Locally
 
 ```bash
-git clone https://github.com/ESTIE-CREATOR/genelens.git
-cd genelens
+git clone https://github.com/ESTIE-CREATOR/GeneLens.git
+cd GeneLens
 python -m venv venv
 source venv/bin/activate     # Mac/Linux
 venv\Scripts\activate        # Windows
@@ -111,7 +114,7 @@ Opens at `http://localhost:8501`
 ## Project Structure
 
 ```
-genelens/
+GeneLens/
 ├── app.py                      ← Main Streamlit application
 ├── requirements.txt
 ├── .streamlit/config.toml      ← Dark theme
@@ -142,19 +145,11 @@ genelens/
 
 ## Related Research
 
-📁 **T2DM Case Study:** [github.com/ESTIE-CREATOR/genelens-t2dm-study](https://github.com/ESTIE-CREATOR/genelens-t2dm-study)
+📁 **T2DM Workflow Case Study:** [github.com/ESTIE-CREATOR/genelens-t2dm-study](https://github.com/ESTIE-CREATOR/genelens-t2dm-study)
 
 ---
 
 ## Built By
-
-**Alabi Esther Oluwatimilehin**
-BSc Biochemistry — First Class Honours, University of Medical Sciences, Nigeria
-[github.com/ESTIE-CREATOR](https://github.com/ESTIE-CREATOR) · [linkedin.com/in/alabi-esther-essie](https://linkedin.com/in/alabi-esther-essie)
-
----
-*MIT License*# GeneLens 🧬
-
 
 **Alabi Esther Oluwatimilehin**
 BSc Biochemistry — First Class Honours, University of Medical Sciences, Nigeria
