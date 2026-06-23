@@ -315,12 +315,24 @@ elif data_source == "📁 Upload File":
 st.success(f"Loaded {dataset_label}")
 
 all_cols = list(df.columns)
+
+# Auto-detect groups from column name keywords
+_ctrl_kw  = {"normal", "control", "ctrl", "wt", "healthy", "untreated", "vehicle", "mock", "neg"}
+_treat_kw = {"treated", "treatment", "disease", "ko", "knockdown", "cancer", "tumor",
+             "diabetes", "t2d", "mutant", "infected", "patient", "case", "high", "low"}
+auto_control = [c for c in all_cols if any(k in c.lower() for k in _ctrl_kw)]
+auto_treated  = [c for c in all_cols if any(k in c.lower() for k in _treat_kw)]
+# Fall back to 50/50 split only if keyword detection found nothing
+if not auto_control and not auto_treated:
+    auto_control = all_cols[: len(all_cols) // 2]
+    auto_treated  = all_cols[len(all_cols) // 2 :]
+
 col1, col2 = st.columns(2)
 with col1:
     control_cols = st.multiselect(
         "Control samples",
         options=all_cols,
-        default=None,
+        default=auto_control,
         key="control_samples",
         help="Select the columns that represent your control / untreated condition.",
     )
@@ -329,7 +341,7 @@ with col2:
     treated_cols = st.multiselect(
         "Treated / disease samples",
         options=remaining_for_treated,
-        default=None,
+        default=[s for s in auto_treated if s in remaining_for_treated],
         key="treated_samples",
         help="Select the columns that represent the treated / disease condition.",
     )
