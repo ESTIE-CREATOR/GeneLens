@@ -319,20 +319,32 @@ col1, col2 = st.columns(2)
 with col1:
     control_cols = st.multiselect(
         "Control samples",
-        all_cols,
-        default=all_cols[: len(all_cols) // 2],
+        options=all_cols,
+        default=None,
+        key="control_samples",
         help="Select the columns that represent your control / untreated condition.",
     )
 with col2:
+    remaining_for_treated = [s for s in all_cols if s not in control_cols]
     treated_cols = st.multiselect(
         "Treated / disease samples",
-        all_cols,
-        default=all_cols[len(all_cols) // 2 :],
+        options=remaining_for_treated,
+        default=None,
+        key="treated_samples",
         help="Select the columns that represent the treated / disease condition.",
     )
 
-if not control_cols or not treated_cols:
-    st.warning("Assign at least one column to each group to run the analysis.")
+if set(control_cols) & set(treated_cols):
+    st.error(
+        "⚠️ The same sample cannot be in both groups. "
+        "Please check your sample assignments."
+    )
+    st.stop()
+
+if len(control_cols) < 2 or len(treated_cols) < 2:
+    st.warning(
+        "⚠️ Each group needs at least 2 samples for statistical analysis."
+    )
     st.stop()
 
 
