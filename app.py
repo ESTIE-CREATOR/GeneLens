@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import io
+import re
 
 
 def parse_count_matrix(file, already_log2: bool) -> pd.DataFrame:
@@ -393,12 +394,16 @@ if len(control_cols) < 2 or len(treated_cols) < 2:
 
 
 # ── Run DE Analysis ───────────────────────────────────────────────────────────
-with st.spinner("Running differential expression analysis..."):
-    results = cached_de_analysis(
-        df, tuple(control_cols), tuple(treated_cols),
-        pval_threshold, fc_threshold, already_log2,
-    )
-    summary = get_summary_stats(results)
+try:
+    with st.spinner("Running differential expression analysis..."):
+        results = cached_de_analysis(
+            df, tuple(control_cols), tuple(treated_cols),
+            pval_threshold, fc_threshold, already_log2,
+        )
+        summary = get_summary_stats(results)
+except Exception as _de_err:
+    st.error(f"Differential expression analysis failed: {_de_err}")
+    st.stop()
 
 # ── Summary Cards ─────────────────────────────────────────────────────────────
 st.markdown('<div class="section-header">SUMMARY</div>', unsafe_allow_html=True)
@@ -449,14 +454,18 @@ else:
 # ── ML Classification ─────────────────────────────────────────────────────────
 st.markdown('<div class="section-header">MACHINE LEARNING CLASSIFICATION</div>', unsafe_allow_html=True)
 
-with st.spinner("Training Random Forest classifier..."):
-    ml_results = cached_ml(df, results, tuple(control_cols), tuple(treated_cols))
-
-ml1, ml2 = st.columns(2)
-with ml1:
-    st.plotly_chart(ml_results["roc_fig"], width='stretch')
-with ml2:
-    st.plotly_chart(ml_results["importance_fig"], width='stretch')
+try:
+    with st.spinner("Training Random Forest classifier..."):
+        ml_results = cached_ml(df, results, tuple(control_cols), tuple(treated_cols))
+    ml1, ml2 = st.columns(2)
+    with ml1:
+        st.plotly_chart(ml_results["roc_fig"], width='stretch')
+    with ml2:
+        st.plotly_chart(ml_results["importance_fig"], width='stretch')
+except Exception as _ml_err:
+    st.warning(f"ML classification could not run: {_ml_err}")
+    ml_results = {"accuracy": 0.0, "std": 0.0, "n_features": 0, "roc_auc": 0.0,
+                  "feature_importances": pd.DataFrame({"Gene": [], "Importance": []})}
 
 st.markdown(f"""
 <div style='text-align:center; padding:0.8rem; background:rgba(124,106,247,0.08); border-radius:8px; font-family:Space Mono,monospace; color:#D1D5DB; font-size:0.85rem;'>
@@ -498,10 +507,9 @@ st.markdown('<div class="section-header">PATHWAY ENRICHMENT — GO & KEGG</div>'
 # Determine if gene index is HGNC symbols (required for Enrichr).
 # True when: GEO data (already processed), or upload with no ID conversion needed,
 # or upload where conversion succeeded (genes no longer look like numeric/ENSG IDs).
-import re as _re
 _sample_ids = [str(g) for g in df.index[:30]]
 _looks_like_symbols = (
-    sum(1 for g in _sample_ids if _re.match(r'^[A-Za-z][A-Z0-9a-z\-\.]+$', g) and not g.isdigit()) / max(len(_sample_ids), 1) >= 0.70
+    sum(1 for g in _sample_ids if re.match(r'^[A-Za-z][A-Z0-9a-z\-\.]+$', g) and not g.isdigit()) / max(len(_sample_ids), 1) >= 0.70
 )
 
 if _looks_like_symbols:

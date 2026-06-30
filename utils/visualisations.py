@@ -169,19 +169,17 @@ def plot_pca(
     var_exp = pca.explained_variance_ratio_ * 100
 
     groups = ["Control"] * len(control_cols) + ["Treated"] * len(treated_cols)
-    colors_list = [COLORS["downregulated"]] * len(control_cols) + [COLORS["upregulated"]] * len(treated_cols)
 
     fig = go.Figure()
     for group, color in [("Control", COLORS["downregulated"]), ("Treated", COLORS["upregulated"])]:
-        mask = [g == group for g in groups]
-        idx = [i for i, m in enumerate(mask) if m]
+        idx = [i for i, g in enumerate(groups) if g == group]
         fig.add_trace(go.Scatter(
             x=coords[idx, 0],
             y=coords[idx, 1],
             mode="markers+text",
             name=group,
             marker=dict(color=color, size=14, opacity=0.85, line=dict(width=1.5, color="white")),
-            text=all_cols[idx[0]:idx[-1]+1] if group == "Control" else [all_cols[i] for i in idx],
+            text=[all_cols[i] for i in idx],
             textposition="top center",
             textfont=dict(size=9),
             hovertemplate=f"<b>%{{text}}</b><br>PC1: %{{x:.2f}}<br>PC2: %{{y:.2f}}<extra></extra>",

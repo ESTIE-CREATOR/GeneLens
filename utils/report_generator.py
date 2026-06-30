@@ -15,24 +15,12 @@ def _fig_to_b64_png(fig, width: int = 900, height: int = 480) -> str:
 
 
 def _table_html(df: pd.DataFrame, fmt: dict | None = None) -> str:
-    rows = []
-    for _, row in df.iterrows():
-        cells = []
-        for col in df.columns:
-            val = row[col]
-            if fmt and col in fmt:
-                try:
-                    val = fmt[col].format(val)
-                except Exception:
-                    pass
-            cells.append(f"<td>{val}</td>")
-        rows.append("<tr>" + "".join(cells) + "</tr>")
-    headers = "".join(f"<th>{c}</th>" for c in df.columns)
-    return (
-        "<table><thead><tr>" + headers + "</tr></thead><tbody>"
-        + "".join(rows)
-        + "</tbody></table>"
-    )
+    if fmt:
+        df = df.copy()
+        for col, fmtstr in fmt.items():
+            if col in df.columns:
+                df[col] = df[col].map(lambda x: fmtstr.format(x))
+    return df.to_html(index=False, border=0, escape=True, classes="gentable")
 
 
 def generate_html_report(
@@ -68,8 +56,9 @@ def generate_html_report(
     b_html = chart_block(fig_bar, 420, 380)
     hm_html = chart_block(fig_heatmap, 900, 600)
     pca_html = chart_block(fig_pca, 700, 480) if fig_pca else "<p style='color:#aaa'>PCA not available (need ≥2 samples per group).</p>"
-    roc_html = chart_block(ml_results["roc_fig"], 500, 420)
-    imp_html = chart_block(ml_results["importance_fig"], 600, 480)
+    _placeholder = "<p style='color:#aaa;text-align:center'>Not available.</p>"
+    roc_html = chart_block(ml_results["roc_fig"], 500, 420) if ml_results.get("roc_fig") else _placeholder
+    imp_html = chart_block(ml_results["importance_fig"], 600, 480) if ml_results.get("importance_fig") else _placeholder
 
     deg_table = _table_html(
         top_degs[["Gene", "log2FoldChange", "pvalue", "padj", "significance"]].head(30),

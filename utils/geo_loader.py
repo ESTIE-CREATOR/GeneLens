@@ -1,6 +1,9 @@
 import os
+import tempfile
 import pandas as pd
 import numpy as np
+
+_GEO_CACHE = os.path.join(tempfile.gettempdir(), "genelens_geo_cache")
 
 EXAMPLE_DATASETS = [
     {
@@ -24,7 +27,7 @@ EXAMPLE_DATASETS = [
 ]
 
 
-def fetch_geo_dataset(accession: str, cache_dir: str = "./geo_cache") -> tuple:
+def fetch_geo_dataset(accession: str, cache_dir: str = _GEO_CACHE) -> tuple:
     """
     Download and parse a GEO dataset by accession number.
 
