@@ -50,7 +50,7 @@ Keep the tone professional and scientific. Write in clear paragraphs, not bullet
     client = anthropic.Anthropic(api_key=api_key)
 
     message = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6-20251001",
         max_tokens=600,
         messages=[{"role": "user", "content": prompt}]
     )

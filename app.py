@@ -47,7 +47,7 @@ from utils.visualisations import plot_volcano, plot_heatmap, plot_pca, plot_deg_
 from utils.ml_classifier import run_ml_classification
 from utils.ai_interpretation import generate_ai_interpretation
 from utils.pathway_enrichment import run_pathway_enrichment, plot_go_bar, plot_kegg_bar
-from utils.gene_mapper import map_ensembl_to_symbol
+from utils.gene_mapper import map_to_gene_symbol
 from utils.report_generator import generate_html_report
 
 # ── Page config ──────────────────────────────────────────────────────────────
@@ -287,6 +287,7 @@ df = None
 control_cols = []
 treated_cols = []
 dataset_label = ""
+_gene_id_type = None   # tracks detected ID format for GO/KEGG gating
 
 if data_source == "🌐 GEO Database":
     active_accession = st.session_state.geo_trigger or (geo_accession if load_geo_btn else "")
@@ -313,11 +314,21 @@ elif data_source == "📁 Upload File":
     if uploaded_file is not None:
         try:
             df = parse_count_matrix(uploaded_file, already_log2)
-            # Auto-convert Ensembl IDs to gene symbols if detected
-            df_mapped = map_ensembl_to_symbol(df)
-            if df_mapped is not df:
-                st.info(f"Detected Ensembl IDs — mapped {len(df_mapped):,} genes to HGNC symbols using local BioMart table.")
-                df = df_mapped
+            df_mapped, _gene_id_type, _map_stats = map_to_gene_symbol(df)
+            if _gene_id_type is not None:
+                if _map_stats["n_mapped"] > 0:
+                    st.info(
+                        f"Detected **{_gene_id_type.replace('_', ' ')}** IDs — "
+                        f"mapped {_map_stats['n_mapped']:,} genes to HGNC symbols "
+                        f"({_map_stats['n_dropped']:,} dropped, no match in local table)."
+                    )
+                    df = df_mapped
+                else:
+                    st.warning(
+                        f"Detected **{_gene_id_type.replace('_', ' ')}** IDs but none matched "
+                        "the local gene symbol table. GO/KEGG enrichment will be unavailable. "
+                        "DE analysis will proceed with the original IDs."
+                    )
             dataset_label = f"**{uploaded_file.name}** — {len(df):,} genes × {len(df.columns)} samples"
         except Exception as exc:
             st.error(f"Error loading file: {exc}")
@@ -484,52 +495,68 @@ st.download_button(
 # ── Pathway Enrichment ───────────────────────────────────────────────────────
 st.markdown('<div class="section-header">PATHWAY ENRICHMENT — GO & KEGG</div>', unsafe_allow_html=True)
 
-run_enrichment = st.button("🔬 Run GO & KEGG Enrichment", help="Queries the Enrichr database — requires internet connection")
+# Determine if gene index is HGNC symbols (required for Enrichr).
+# True when: GEO data (already processed), or upload with no ID conversion needed,
+# or upload where conversion succeeded (genes no longer look like numeric/ENSG IDs).
+import re as _re
+_sample_ids = [str(g) for g in df.index[:30]]
+_looks_like_symbols = (
+    sum(1 for g in _sample_ids if _re.match(r'^[A-Za-z][A-Z0-9a-z\-\.]+$', g) and not g.isdigit()) / max(len(_sample_ids), 1) >= 0.70
+)
 
-if run_enrichment:
-    with st.spinner("Running GO and KEGG enrichment via Enrichr..."):
-        enr_results = cached_pathway_enrichment(results)
+if _looks_like_symbols:
+    run_enrichment = st.button(
+        "🔬 Run GO & KEGG Enrichment",
+        help="Queries the Enrichr database — requires internet connection",
+    )
+    if run_enrichment:
+        with st.spinner("Running GO and KEGG enrichment via Enrichr..."):
+            enr_results = cached_pathway_enrichment(results)
 
-    if enr_results["success"]:
-        st.success(
-            f"✅ Enrichment complete — {enr_results['n_de_genes']} DE genes analysed "
-            f"({enr_results['n_up']} up, {enr_results['n_down']} down)",
-            icon="🧬"
-        )
-
-        tab_go, tab_kegg = st.tabs(["GO Biological Process", "KEGG Pathways"])
-
-        with tab_go:
-            if not enr_results["go_results"].empty:
-                fig_go = plot_go_bar(enr_results["go_results"])
-                if fig_go:
-                    st.plotly_chart(fig_go, width='stretch')
-                go_display = enr_results["go_results"][["Term", "Overlap", "Adjusted P-value", "Genes"]].copy()
-                go_display["Adjusted P-value"] = go_display["Adjusted P-value"].map("{:.2e}".format)
-                st.dataframe(go_display, use_container_width=True, height=320)
-            else:
-                st.info("No significant GO terms found at padj < 0.05 for this gene set.")
-
-        with tab_kegg:
-            if not enr_results["kegg_results"].empty:
-                fig_kegg = plot_kegg_bar(enr_results["kegg_results"])
-                if fig_kegg:
-                    st.plotly_chart(fig_kegg, width='stretch')
-                kegg_display = enr_results["kegg_results"][["Term", "Overlap", "Adjusted P-value", "Genes"]].copy()
-                kegg_display["Adjusted P-value"] = kegg_display["Adjusted P-value"].map("{:.2e}".format)
-                st.dataframe(kegg_display, use_container_width=True, height=320)
-            else:
-                st.info("No significant KEGG pathways found at padj < 0.05 for this gene set.")
-
+        if enr_results["success"]:
+            st.success(
+                f"✅ Enrichment complete — {enr_results['n_de_genes']} DE genes analysed "
+                f"({enr_results['n_up']} up, {enr_results['n_down']} down)",
+                icon="🧬"
+            )
+            tab_go, tab_kegg = st.tabs(["GO Biological Process", "KEGG Pathways"])
+            with tab_go:
+                if not enr_results["go_results"].empty:
+                    fig_go = plot_go_bar(enr_results["go_results"])
+                    if fig_go:
+                        st.plotly_chart(fig_go, width='stretch')
+                    go_display = enr_results["go_results"][["Term", "Overlap", "Adjusted P-value", "Genes"]].copy()
+                    go_display["Adjusted P-value"] = go_display["Adjusted P-value"].map("{:.2e}".format)
+                    st.dataframe(go_display, use_container_width=True, height=320)
+                else:
+                    st.info("No significant GO terms found at padj < 0.05 for this gene set.")
+            with tab_kegg:
+                if not enr_results["kegg_results"].empty:
+                    fig_kegg = plot_kegg_bar(enr_results["kegg_results"])
+                    if fig_kegg:
+                        st.plotly_chart(fig_kegg, width='stretch')
+                    kegg_display = enr_results["kegg_results"][["Term", "Overlap", "Adjusted P-value", "Genes"]].copy()
+                    kegg_display["Adjusted P-value"] = kegg_display["Adjusted P-value"].map("{:.2e}".format)
+                    st.dataframe(kegg_display, use_container_width=True, height=320)
+                else:
+                    st.info("No significant KEGG pathways found at padj < 0.05 for this gene set.")
+        else:
+            st.info(
+                f"Pathway enrichment requires an internet connection to query the Enrichr database. "
+                f"Error: {enr_results.get('error', 'Unknown error')}. "
+                "The rest of the analysis above is fully available.",
+                icon="🌐"
+            )
     else:
-        st.info(
-            f"ℹ️ Pathway enrichment requires an internet connection to query the Enrichr database. "
-            f"Error: {enr_results.get('error', 'Unknown error')}. "
-            f"The rest of the analysis above is fully available offline.",
-            icon="🌐"
-        )
+        st.info("Click **Run GO & KEGG Enrichment** above to query the Enrichr database for pathway hits.")
 else:
-    st.info("Click **Run GO & KEGG Enrichment** above to query the Enrichr database for pathway hits.")
+    st.info(
+        "GO & KEGG enrichment is not available for this dataset — gene IDs could not be "
+        "converted to HGNC symbols (detected format: "
+        f"**{_gene_id_type or 'unknown'}**). "
+        "All other analysis features above are fully available.",
+        icon="ℹ️"
+    )
 
 
 # ── AI Interpretation ─────────────────────────────────────────────────────────
