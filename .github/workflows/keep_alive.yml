@@ -2,7 +2,7 @@ name: Keep GeneLens Alive
 
 on:
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -11,5 +11,6 @@ jobs:
     steps:
       - name: Ping GeneLens to prevent sleep
         run: |
-          curl -s -o /dev/null -w "%{http_code}" https://genelens.streamlit.app/ || true
-          echo "Ping sent to genelens.streamlit.app"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 --retry 3 --retry-delay 5 https://genelens.streamlit.app/) || STATUS="failed"
+          echo "HTTP status: $STATUS"
+          echo "Ping sent at $(date -u)"

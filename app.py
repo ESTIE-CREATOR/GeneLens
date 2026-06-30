@@ -47,6 +47,8 @@ from utils.visualisations import plot_volcano, plot_heatmap, plot_pca, plot_deg_
 from utils.ml_classifier import run_ml_classification
 from utils.ai_interpretation import generate_ai_interpretation
 from utils.pathway_enrichment import run_pathway_enrichment, plot_go_bar, plot_kegg_bar
+from utils.gene_mapper import map_ensembl_to_symbol
+from utils.report_generator import generate_html_report
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -311,6 +313,11 @@ elif data_source == "📁 Upload File":
     if uploaded_file is not None:
         try:
             df = parse_count_matrix(uploaded_file, already_log2)
+            # Auto-convert Ensembl IDs to gene symbols if detected
+            df_mapped = map_ensembl_to_symbol(df)
+            if df_mapped is not df:
+                st.info(f"Detected Ensembl IDs — mapped {len(df_mapped):,} genes to HGNC symbols using local BioMart table.")
+                df = df_mapped
             dataset_label = f"**{uploaded_file.name}** — {len(df):,} genes × {len(df.columns)} samples"
         except Exception as exc:
             st.error(f"Error loading file: {exc}")
@@ -528,6 +535,8 @@ else:
 # ── AI Interpretation ─────────────────────────────────────────────────────────
 st.markdown('<div class="section-header">AI BIOLOGICAL INTERPRETATION</div>', unsafe_allow_html=True)
 
+interpretation = ""  # populated below if AI runs
+
 if run_ai:
     if not api_key:
         st.error("Please enter your Anthropic API key in the sidebar.")
@@ -546,6 +555,7 @@ if run_ai:
                     ml_auc=ml_results["roc_auc"],
                     top_features=top_features,
                 )
+                st.session_state["interpretation"] = interpretation
                 st.markdown(f'<div class="ai-box">{interpretation}</div>', unsafe_allow_html=True)
 
                 report = f"""GeneLens — AI Biological Interpretation
@@ -585,6 +595,39 @@ else:
         <b style="color:#7C6AF7">✨ Generate AI Interpretation</b> to get a biological analysis of your results.
     </div>
     """, unsafe_allow_html=True)
+
+# ── Export Report ─────────────────────────────────────────────────────────────
+st.markdown('<div class="section-header">EXPORT REPORT</div>', unsafe_allow_html=True)
+
+col_exp1, col_exp2 = st.columns([1, 3])
+with col_exp1:
+    if st.button("📄 Generate Full Report", help="Creates a self-contained HTML report with all charts, tables, and analysis"):
+        with st.spinner("Building report..."):
+            saved_interp = st.session_state.get("interpretation", "")
+            html_bytes = generate_html_report(
+                dataset_label=dataset_label,
+                summary=summary,
+                results=results,
+                ml_results=ml_results,
+                top_degs=top_degs,
+                fig_volcano=fig_volcano,
+                fig_heatmap=fig_heatmap,
+                fig_pca=fig_pca,
+                fig_bar=fig_bar,
+                interpretation=saved_interp,
+            )
+        st.download_button(
+            "⬇️ Download Report (HTML)",
+            data=html_bytes,
+            file_name="genelens_report.html",
+            mime="text/html",
+        )
+with col_exp2:
+    st.markdown(
+        "<small style='color:#6B7280'>Opens in any browser · includes all interactive charts · "
+        "use <b>File → Print → Save as PDF</b> to get a PDF version</small>",
+        unsafe_allow_html=True
+    )
 
 st.markdown("---")
 st.markdown(
