@@ -261,10 +261,24 @@ st.markdown('<div class="main-header">GeneLens</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-header">Differential Expression · ML Classification · AI Interpretation</div>', unsafe_allow_html=True)
 
 
-# ── Load Data ─────────────────────────────────────────────────────────────────
+# ── Cached computation helpers ────────────────────────────────────────────────
 @st.cache_data(show_spinner="Downloading from NCBI GEO — this may take a minute…")
 def cached_fetch_geo(accession: str):
     return fetch_geo_dataset(accession)
+
+@st.cache_data(show_spinner=False)
+def cached_de_analysis(df, control_t, treated_t, pval_threshold, fc_threshold, already_log2):
+    return run_differential_expression(
+        df, list(control_t), list(treated_t), pval_threshold, fc_threshold, already_log2
+    )
+
+@st.cache_data(show_spinner=False)
+def cached_ml(df, results, control_t, treated_t):
+    return run_ml_classification(df, results, list(control_t), list(treated_t))
+
+@st.cache_data(show_spinner=False)
+def cached_pathway_enrichment(results):
+    return run_pathway_enrichment(results)
 
 
 df = None
@@ -362,11 +376,9 @@ if len(control_cols) < 2 or len(treated_cols) < 2:
 
 # ── Run DE Analysis ───────────────────────────────────────────────────────────
 with st.spinner("Running differential expression analysis..."):
-    results = run_differential_expression(
-        df, control_cols, treated_cols,
-        pval_threshold=pval_threshold,
-        fc_threshold=fc_threshold,
-        already_log2=already_log2,
+    results = cached_de_analysis(
+        df, tuple(control_cols), tuple(treated_cols),
+        pval_threshold, fc_threshold, already_log2,
     )
     summary = get_summary_stats(results)
 
@@ -420,7 +432,7 @@ else:
 st.markdown('<div class="section-header">MACHINE LEARNING CLASSIFICATION</div>', unsafe_allow_html=True)
 
 with st.spinner("Training Random Forest classifier..."):
-    ml_results = run_ml_classification(df, results, control_cols, treated_cols)
+    ml_results = cached_ml(df, results, tuple(control_cols), tuple(treated_cols))
 
 ml1, ml2 = st.columns(2)
 with ml1:
@@ -447,7 +459,7 @@ st.dataframe(
         "pvalue": "{:.2e}",
         "padj": "{:.2e}",
     }),
-    width='stretch',
+    use_container_width=True,
     height=380
 )
 
@@ -465,47 +477,52 @@ st.download_button(
 # ── Pathway Enrichment ───────────────────────────────────────────────────────
 st.markdown('<div class="section-header">PATHWAY ENRICHMENT — GO & KEGG</div>', unsafe_allow_html=True)
 
-with st.spinner("Running GO and KEGG enrichment via Enrichr..."):
-    enr_results = run_pathway_enrichment(results)
+run_enrichment = st.button("🔬 Run GO & KEGG Enrichment", help="Queries the Enrichr database — requires internet connection")
 
-if enr_results["success"]:
-    st.success(
-        f"✅ Enrichment complete — {enr_results['n_de_genes']} DE genes analysed "
-        f"({enr_results['n_up']} up, {enr_results['n_down']} down)",
-        icon="🧬"
-    )
+if run_enrichment:
+    with st.spinner("Running GO and KEGG enrichment via Enrichr..."):
+        enr_results = cached_pathway_enrichment(results)
 
-    tab_go, tab_kegg = st.tabs(["GO Biological Process", "KEGG Pathways"])
+    if enr_results["success"]:
+        st.success(
+            f"✅ Enrichment complete — {enr_results['n_de_genes']} DE genes analysed "
+            f"({enr_results['n_up']} up, {enr_results['n_down']} down)",
+            icon="🧬"
+        )
 
-    with tab_go:
-        if not enr_results["go_results"].empty:
-            fig_go = plot_go_bar(enr_results["go_results"])
-            if fig_go:
-                st.plotly_chart(fig_go, width='stretch')
-            go_display = enr_results["go_results"][["Term", "Overlap", "Adjusted P-value", "Genes"]].copy()
-            go_display["Adjusted P-value"] = go_display["Adjusted P-value"].map("{:.2e}".format)
-            st.dataframe(go_display, use_container_width=True, height=320)
-        else:
-            st.info("No significant GO terms found at padj < 0.05 for this gene set.")
+        tab_go, tab_kegg = st.tabs(["GO Biological Process", "KEGG Pathways"])
 
-    with tab_kegg:
-        if not enr_results["kegg_results"].empty:
-            fig_kegg = plot_kegg_bar(enr_results["kegg_results"])
-            if fig_kegg:
-                st.plotly_chart(fig_kegg, width='stretch')
-            kegg_display = enr_results["kegg_results"][["Term", "Overlap", "Adjusted P-value", "Genes"]].copy()
-            kegg_display["Adjusted P-value"] = kegg_display["Adjusted P-value"].map("{:.2e}".format)
-            st.dataframe(kegg_display, use_container_width=True, height=320)
-        else:
-            st.info("No significant KEGG pathways found at padj < 0.05 for this gene set.")
+        with tab_go:
+            if not enr_results["go_results"].empty:
+                fig_go = plot_go_bar(enr_results["go_results"])
+                if fig_go:
+                    st.plotly_chart(fig_go, width='stretch')
+                go_display = enr_results["go_results"][["Term", "Overlap", "Adjusted P-value", "Genes"]].copy()
+                go_display["Adjusted P-value"] = go_display["Adjusted P-value"].map("{:.2e}".format)
+                st.dataframe(go_display, use_container_width=True, height=320)
+            else:
+                st.info("No significant GO terms found at padj < 0.05 for this gene set.")
 
+        with tab_kegg:
+            if not enr_results["kegg_results"].empty:
+                fig_kegg = plot_kegg_bar(enr_results["kegg_results"])
+                if fig_kegg:
+                    st.plotly_chart(fig_kegg, width='stretch')
+                kegg_display = enr_results["kegg_results"][["Term", "Overlap", "Adjusted P-value", "Genes"]].copy()
+                kegg_display["Adjusted P-value"] = kegg_display["Adjusted P-value"].map("{:.2e}".format)
+                st.dataframe(kegg_display, use_container_width=True, height=320)
+            else:
+                st.info("No significant KEGG pathways found at padj < 0.05 for this gene set.")
+
+    else:
+        st.info(
+            f"ℹ️ Pathway enrichment requires an internet connection to query the Enrichr database. "
+            f"Error: {enr_results.get('error', 'Unknown error')}. "
+            f"The rest of the analysis above is fully available offline.",
+            icon="🌐"
+        )
 else:
-    st.info(
-        f"ℹ️ Pathway enrichment requires an internet connection to query the Enrichr database. "
-        f"Error: {enr_results.get('error', 'Unknown error')}. "
-        f"The rest of the analysis above is fully available offline.",
-        icon="🌐"
-    )
+    st.info("Click **Run GO & KEGG Enrichment** above to query the Enrichr database for pathway hits.")
 
 
 # ── AI Interpretation ─────────────────────────────────────────────────────────
