@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import io
 import re
-import plotly.io as pio
 
 
 def parse_count_matrix(file, already_log2: bool) -> pd.DataFrame:
@@ -50,14 +49,14 @@ from utils.ml_classifier import run_ml_classification
 from utils.ai_interpretation import generate_ai_interpretation
 from utils.pathway_enrichment import run_pathway_enrichment, plot_go_bar, plot_kegg_bar
 from utils.gene_mapper import map_to_gene_symbol
-from utils.report_generator import generate_pdf_report, ensure_kaleido_chrome
+from utils.report_generator import generate_pdf_report, ensure_kaleido_chrome, render_chart_png
 
 
 def chart_download_button(fig, file_name: str, key: str, width: int = 1000, height: int = 600):
     """Small PNG download button for a single chart, so it can be reused outside the report."""
     ensure_kaleido_chrome()
     try:
-        png = pio.to_image(fig, format="png", width=width, height=height, scale=2)
+        png = render_chart_png(fig, width=width, height=height, scale=2)
     except Exception:
         return
     st.download_button("⬇️ PNG", data=png, file_name=file_name, mime="image/png", key=key)

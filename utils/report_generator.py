@@ -1,8 +1,8 @@
 import io
+import shutil
 import datetime
 from xml.sax.saxutils import escape
 import pandas as pd
-import plotly.io as pio
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.units import inch
 from reportlab.lib import colors
@@ -28,16 +28,26 @@ _CELL = ParagraphStyle("GLCell", parent=_styles["Normal"], fontSize=8, leading=1
 
 _chrome_checked = False
 
+# Prefer a system-installed Chromium (e.g. `apt install chromium` via packages.txt)
+# over kaleido's own downloaded "Chrome for Testing" copy. On Debian hosts like
+# Streamlit Cloud, apt resolves the correct shared-library dependency names for
+# whatever release is running; kaleido's standalone download has no such guarantee
+# and can crash on launch ("browser closed immediately") if libs are missing.
+_SYSTEM_CHROME_PATH = (
+    shutil.which("chromium")
+    or shutil.which("chromium-browser")
+    or shutil.which("google-chrome")
+    or shutil.which("google-chrome-stable")
+)
+
 
 def ensure_kaleido_chrome():
     """
-    Kaleido 1.x ships no browser — it needs Chrome for Testing downloaded once
-    into its cache dir. Servers like Streamlit Cloud don't have Chrome installed,
-    so without this every chart export fails. Safe to call repeatedly; only
-    downloads on the first call per process.
+    Fallback for hosts without a system Chromium: download kaleido's own
+    "Chrome for Testing" once per process. Safe to call repeatedly.
     """
     global _chrome_checked
-    if _chrome_checked:
+    if _chrome_checked or _SYSTEM_CHROME_PATH:
         return
     _chrome_checked = True
     try:
@@ -47,13 +57,25 @@ def ensure_kaleido_chrome():
         pass
 
 
+def render_chart_png(fig, width: int = 900, height: int = 500, scale: float = 2) -> bytes:
+    """Render a plotly figure to PNG bytes, preferring the system Chromium if present."""
+    import kaleido
+    fig_dict = fig.to_dict() if hasattr(fig, "to_dict") else fig
+    kopts = {"path": _SYSTEM_CHROME_PATH} if _SYSTEM_CHROME_PATH else {}
+    return kaleido.calc_fig_sync(
+        fig_dict,
+        opts=dict(format="png", width=width, height=height, scale=scale),
+        kopts=kopts,
+    )
+
+
 def _add_chart(story: list, fig, width_in: float, w_px: int = 900, h_px: int = 500):
     """Append a chart image to the story, or a visible error note if rendering fails."""
     if fig is None:
         story.append(Paragraph("Not available.", _styles["Normal"]))
         return
     try:
-        png = pio.to_image(fig, format="png", width=w_px, height=h_px, scale=2)
+        png = render_chart_png(fig, width=w_px, height=h_px, scale=2)
     except Exception as e:
         story.append(Paragraph(
             f'<font color="{ERROR_COLOR_HEX}">Chart could not be rendered: {escape(str(e))[:200]}</font>',
