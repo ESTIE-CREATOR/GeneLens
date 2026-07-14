@@ -49,7 +49,7 @@ from utils.ml_classifier import run_ml_classification
 from utils.ai_interpretation import generate_ai_interpretation
 from utils.pathway_enrichment import run_pathway_enrichment, plot_go_bar, plot_kegg_bar
 from utils.gene_mapper import map_to_gene_symbol
-from utils.report_generator import generate_html_report
+from utils.report_generator import generate_docx_report
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -636,10 +636,10 @@ st.markdown('<div class="section-header">EXPORT REPORT</div>', unsafe_allow_html
 
 col_exp1, col_exp2 = st.columns([1, 3])
 with col_exp1:
-    if st.button("📄 Generate Full Report", help="Creates a self-contained HTML report with all charts, tables, and analysis"):
+    if st.button("📄 Generate Full Report", help="Creates a Word (.docx) report with all charts, tables, and analysis"):
         with st.spinner("Building report..."):
             saved_interp = st.session_state.get("interpretation", "")
-            html_bytes = generate_html_report(
+            docx_bytes = generate_docx_report(
                 dataset_label=dataset_label,
                 summary=summary,
                 results=results,
@@ -652,15 +652,14 @@ with col_exp1:
                 interpretation=saved_interp,
             )
         st.download_button(
-            "⬇️ Download Report (HTML)",
-            data=html_bytes,
-            file_name="genelens_report.html",
-            mime="text/html",
+            "⬇️ Download Report (DOCX)",
+            data=docx_bytes,
+            file_name="genelens_report.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         )
 with col_exp2:
     st.markdown(
-        "<small style='color:#6B7280'>Opens in any browser · includes all interactive charts · "
-        "use <b>File → Print → Save as PDF</b> to get a PDF version</small>",
+        "<small style='color:#6B7280'>Opens in Microsoft Word / Google Docs · includes charts as images and full tables</small>",
         unsafe_allow_html=True
     )
 
