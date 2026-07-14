@@ -1,54 +1,78 @@
 import io
 import datetime
+from xml.sax.saxutils import escape
 import pandas as pd
 import plotly.io as pio
-from docx import Document
-from docx.shared import Inches
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from reportlab.lib.pagesizes import LETTER
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle, PageBreak
+
+ACCENT = colors.HexColor("#7C6AF7")
+DARK = colors.HexColor("#1a1d27")
+MUTED = colors.HexColor("#6b7280")
+FOOTER_COLOR = colors.HexColor("#374151")
+
+_styles = getSampleStyleSheet()
+_TITLE = ParagraphStyle("GLTitle", parent=_styles["Title"], textColor=ACCENT)
+_H2 = ParagraphStyle("GLH2", parent=_styles["Heading2"], textColor=ACCENT, spaceBefore=14)
+_META = ParagraphStyle("GLMeta", parent=_styles["Normal"], textColor=MUTED, fontSize=9)
+_NOTE = ParagraphStyle("GLNote", parent=_styles["Normal"], alignment=TA_CENTER, fontSize=9, textColor=MUTED)
+_FOOTER = ParagraphStyle("GLFooter", parent=_styles["Normal"], alignment=TA_CENTER, textColor=FOOTER_COLOR)
 
 
-def _fig_to_png_stream(fig, width: int = 900, height: int = 480):
+def _fig_to_image(fig, width_in: float, w_px: int = 900, h_px: int = 500):
+    if fig is None:
+        return None
     try:
-        png = pio.to_image(fig, format="png", width=width, height=height, scale=1.5)
-        return io.BytesIO(png)
+        png = pio.to_image(fig, format="png", width=w_px, height=h_px, scale=2)
     except Exception:
         return None
+    height_in = width_in * (h_px / w_px)
+    return Image(io.BytesIO(png), width=width_in * inch, height=height_in * inch)
 
 
-def _add_chart(doc, fig, width_in: float = 6.0):
-    if fig is None:
-        doc.add_paragraph("Not available.")
-        return
-    stream = _fig_to_png_stream(fig)
-    if stream is None:
-        doc.add_paragraph("Chart unavailable (rendering failed).")
-        return
-    doc.add_picture(stream, width=Inches(width_in))
-    doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+def _summary_table(summary: dict, ml_results: dict) -> Table:
+    labels = ["Total Genes", "Upregulated", "Downregulated", "Not Significant", "ML CV AUC"]
+    values = [
+        f"{summary['total_genes']:,}", f"{summary['upregulated']:,}",
+        f"{summary['downregulated']:,}", f"{summary['not_significant']:,}",
+        f"{ml_results['accuracy']:.3f}",
+    ]
+    t = Table([labels, values], hAlign="LEFT", colWidths=[1.42 * inch] * 5)
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), DARK),
+        ("TEXTCOLOR", (0, 0), (-1, 0), ACCENT),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#dddddd")),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    return t
 
 
-def _set_header_cell(cell, text):
-    cell.text = text
-    cell.paragraphs[0].runs[0].bold = True
-
-
-def _add_deg_table(doc, top_degs: pd.DataFrame):
+def _deg_table(top_degs: pd.DataFrame) -> Table:
     cols = ["Gene", "log2FoldChange", "pvalue", "padj", "significance"]
-    df = top_degs[cols].head(30)
-    table = doc.add_table(rows=1, cols=len(cols))
-    table.style = "Light Grid Accent 1"
-    for i, col in enumerate(cols):
-        _set_header_cell(table.rows[0].cells[i], col)
-    for _, row in df.iterrows():
-        cells = table.add_row().cells
-        cells[0].text = str(row["Gene"])
-        cells[1].text = f"{row['log2FoldChange']:.3f}"
-        cells[2].text = f"{row['pvalue']:.2e}"
-        cells[3].text = f"{row['padj']:.2e}"
-        cells[4].text = str(row["significance"])
+    deg = top_degs[cols].head(30)
+    rows = [cols] + [
+        [str(r["Gene"]), f"{r['log2FoldChange']:.3f}", f"{r['pvalue']:.2e}", f"{r['padj']:.2e}", str(r["significance"])]
+        for _, r in deg.iterrows()
+    ]
+    t = Table(rows, hAlign="LEFT", repeatRows=1, colWidths=[1.3 * inch, 1.1 * inch, 1.1 * inch, 1.1 * inch, 1.6 * inch])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), DARK),
+        ("TEXTCOLOR", (0, 0), (-1, 0), ACCENT),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#dddddd")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f5f5f7")]),
+    ]))
+    return t
 
 
-def generate_docx_report(
+def generate_pdf_report(
     dataset_label: str,
     summary: dict,
     results: pd.DataFrame,
@@ -61,66 +85,67 @@ def generate_docx_report(
     interpretation: str = "",
 ) -> bytes:
     now = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-    doc = Document()
-
-    doc.add_heading("GeneLens Analysis Report", level=0)
-    meta = doc.add_paragraph()
-    meta.add_run(f"Dataset: {dataset_label}    ·    Generated: {now}").italic = True
-
-    doc.add_heading("Summary", level=1)
-    labels = ["Total Genes", "Upregulated", "Downregulated", "Not Significant", "ML CV AUC"]
-    values = [
-        f"{summary['total_genes']:,}",
-        f"{summary['upregulated']:,}",
-        f"{summary['downregulated']:,}",
-        f"{summary['not_significant']:,}",
-        f"{ml_results['accuracy']:.3f}",
-    ]
-    summary_table = doc.add_table(rows=2, cols=len(labels))
-    summary_table.style = "Light Grid Accent 1"
-    for i, lbl in enumerate(labels):
-        _set_header_cell(summary_table.rows[0].cells[i], lbl)
-    for i, val in enumerate(values):
-        summary_table.rows[1].cells[i].text = val
-
-    doc.add_heading("Differential Expression", level=1)
-    _add_chart(doc, fig_volcano)
-    _add_chart(doc, fig_bar, width_in=4.0)
-
-    doc.add_heading("Heatmap — Top DE Genes", level=1)
-    _add_chart(doc, fig_heatmap)
-
-    doc.add_heading("PCA — Sample Clustering", level=1)
-    if fig_pca:
-        _add_chart(doc, fig_pca)
-    else:
-        doc.add_paragraph("PCA not available (need ≥2 samples per group).")
-
-    doc.add_heading("Machine Learning Classification", level=1)
-    _add_chart(doc, ml_results.get("roc_fig"), width_in=4.0)
-    _add_chart(doc, ml_results.get("importance_fig"), width_in=4.5)
-    ml_p = doc.add_paragraph()
-    ml_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    ml_p.add_run(
-        f"Cross-Validation AUC: {ml_results['accuracy']:.3f} ± {ml_results['std']:.3f}   |   "
-        f"Features: {ml_results['n_features']} genes"
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=LETTER,
+        topMargin=0.6 * inch, bottomMargin=0.6 * inch,
+        leftMargin=0.6 * inch, rightMargin=0.6 * inch,
     )
 
-    doc.add_heading("Top DE Genes", level=1)
-    _add_deg_table(doc, top_degs)
+    story = [
+        Paragraph("GeneLens Analysis Report", _TITLE),
+        Paragraph(f"Dataset: {escape(dataset_label)} &nbsp;&nbsp;|&nbsp;&nbsp; Generated: {now}", _META),
+        Spacer(1, 12),
+        Paragraph("Summary", _H2),
+        _summary_table(summary, ml_results),
+        Paragraph("Differential Expression", _H2),
+    ]
+
+    img = _fig_to_image(fig_volcano, width_in=6.5, w_px=900, h_px=500)
+    if img:
+        story.append(img)
+    img = _fig_to_image(fig_bar, width_in=3.5, w_px=420, h_px=380)
+    if img:
+        story.append(img)
+
+    story.append(Paragraph("Heatmap — Top DE Genes", _H2))
+    img = _fig_to_image(fig_heatmap, width_in=6.5, w_px=900, h_px=600)
+    if img:
+        story.append(img)
+
+    story.append(Paragraph("PCA — Sample Clustering", _H2))
+    if fig_pca is not None:
+        img = _fig_to_image(fig_pca, width_in=5.5, w_px=700, h_px=480)
+        if img:
+            story.append(img)
+    else:
+        story.append(Paragraph("PCA not available (need ≥2 samples per group).", _styles["Normal"]))
+
+    story.append(Paragraph("Machine Learning Classification", _H2))
+    img = _fig_to_image(ml_results.get("roc_fig"), width_in=4.0, w_px=500, h_px=420)
+    if img:
+        story.append(img)
+    img = _fig_to_image(ml_results.get("importance_fig"), width_in=4.5, w_px=600, h_px=480)
+    if img:
+        story.append(img)
+    story.append(Paragraph(
+        f"Cross-Validation AUC: {ml_results['accuracy']:.3f} ± {ml_results['std']:.3f} "
+        f"&nbsp;|&nbsp; Features: {ml_results['n_features']} genes",
+        _NOTE,
+    ))
+
+    story.append(PageBreak())
+    story.append(Paragraph("Top DE Genes", _H2))
+    story.append(_deg_table(top_degs))
 
     if interpretation:
-        doc.add_heading("AI Biological Interpretation", level=1)
-        doc.add_paragraph(interpretation)
+        story.append(Spacer(1, 14))
+        story.append(Paragraph("AI Biological Interpretation", _H2))
+        story.append(Paragraph(escape(interpretation).replace("\n", "<br/>"), _styles["Normal"]))
 
-    doc.add_paragraph()
-    footer1 = doc.add_paragraph()
-    footer1.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    footer1.add_run("Generated by GeneLens — Real Gene Expression Analysis").bold = True
-    footer2 = doc.add_paragraph()
-    footer2.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    footer2.add_run("genelens.streamlit.app").italic = True
+    story.append(Spacer(1, 30))
+    story.append(Paragraph("<b>Generated by GeneLens — Real Gene Expression Analysis</b>", _FOOTER))
+    story.append(Paragraph("<i>genelens.streamlit.app</i>", _FOOTER))
 
-    buf = io.BytesIO()
-    doc.save(buf)
+    doc.build(story)
     return buf.getvalue()

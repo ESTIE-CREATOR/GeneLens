@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import io
 import re
+import plotly.io as pio
 
 
 def parse_count_matrix(file, already_log2: bool) -> pd.DataFrame:
@@ -49,7 +50,17 @@ from utils.ml_classifier import run_ml_classification
 from utils.ai_interpretation import generate_ai_interpretation
 from utils.pathway_enrichment import run_pathway_enrichment, plot_go_bar, plot_kegg_bar
 from utils.gene_mapper import map_to_gene_symbol
-from utils.report_generator import generate_docx_report
+from utils.report_generator import generate_pdf_report
+
+
+def chart_download_button(fig, file_name: str, key: str, width: int = 1000, height: int = 600):
+    """Small PNG download button for a single chart, so it can be reused outside the report."""
+    try:
+        png = pio.to_image(fig, format="png", width=width, height=height, scale=2)
+    except Exception:
+        return
+    st.download_button("⬇️ PNG", data=png, file_name=file_name, mime="image/png", key=key)
+
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -431,15 +442,18 @@ col_v, col_b = st.columns([2, 1])
 with col_v:
     fig_volcano = plot_volcano(results, pval_threshold, fc_threshold, label_top_n)
     st.plotly_chart(fig_volcano, width='stretch')
+    chart_download_button(fig_volcano, "genelens_volcano.png", key="dl_volcano")
 with col_b:
     fig_bar = plot_deg_bar(results)
     st.plotly_chart(fig_bar, width='stretch')
+    chart_download_button(fig_bar, "genelens_deg_bar.png", key="dl_bar", width=500, height=450)
 
 
 # ── Heatmap ───────────────────────────────────────────────────────────────────
 st.markdown('<div class="section-header">HEATMAP</div>', unsafe_allow_html=True)
 fig_heatmap = plot_heatmap(df, results, control_cols, treated_cols, top_n=top_n_heatmap)
 st.plotly_chart(fig_heatmap, width='stretch')
+chart_download_button(fig_heatmap, "genelens_heatmap.png", key="dl_heatmap", width=1000, height=700)
 
 
 # ── PCA ───────────────────────────────────────────────────────────────────────
@@ -447,6 +461,7 @@ st.markdown('<div class="section-header">PCA — SAMPLE CLUSTERING</div>', unsaf
 fig_pca = plot_pca(df, control_cols, treated_cols)
 if fig_pca is not None:
     st.plotly_chart(fig_pca, width='stretch')
+    chart_download_button(fig_pca, "genelens_pca.png", key="dl_pca", width=800, height=550)
 else:
     st.info("PCA requires at least 2 samples in each group.")
 
@@ -460,8 +475,10 @@ try:
     ml1, ml2 = st.columns(2)
     with ml1:
         st.plotly_chart(ml_results["roc_fig"], width='stretch')
+        chart_download_button(ml_results["roc_fig"], "genelens_roc.png", key="dl_roc", width=600, height=500)
     with ml2:
         st.plotly_chart(ml_results["importance_fig"], width='stretch')
+        chart_download_button(ml_results["importance_fig"], "genelens_feature_importance.png", key="dl_importance", width=650, height=520)
 except Exception as _ml_err:
     st.warning(f"ML classification could not run: {_ml_err}")
     ml_results = {"accuracy": 0.0, "std": 0.0, "n_features": 0, "roc_auc": 0.0,
@@ -533,6 +550,7 @@ if _looks_like_symbols:
                     fig_go = plot_go_bar(enr_results["go_results"])
                     if fig_go:
                         st.plotly_chart(fig_go, width='stretch')
+                        chart_download_button(fig_go, "genelens_go_enrichment.png", key="dl_go", width=900, height=550)
                     go_display = enr_results["go_results"][["Term", "Overlap", "Adjusted P-value", "Genes"]].copy()
                     go_display["Adjusted P-value"] = go_display["Adjusted P-value"].map("{:.2e}".format)
                     st.dataframe(go_display, use_container_width=True, height=320)
@@ -543,6 +561,7 @@ if _looks_like_symbols:
                     fig_kegg = plot_kegg_bar(enr_results["kegg_results"])
                     if fig_kegg:
                         st.plotly_chart(fig_kegg, width='stretch')
+                        chart_download_button(fig_kegg, "genelens_kegg_enrichment.png", key="dl_kegg", width=900, height=550)
                     kegg_display = enr_results["kegg_results"][["Term", "Overlap", "Adjusted P-value", "Genes"]].copy()
                     kegg_display["Adjusted P-value"] = kegg_display["Adjusted P-value"].map("{:.2e}".format)
                     st.dataframe(kegg_display, use_container_width=True, height=320)
@@ -636,10 +655,10 @@ st.markdown('<div class="section-header">EXPORT REPORT</div>', unsafe_allow_html
 
 col_exp1, col_exp2 = st.columns([1, 3])
 with col_exp1:
-    if st.button("📄 Generate Full Report", help="Creates a Word (.docx) report with all charts, tables, and analysis"):
+    if st.button("📄 Generate Full Report", help="Creates a PDF report with all charts, tables, and analysis"):
         with st.spinner("Building report..."):
             saved_interp = st.session_state.get("interpretation", "")
-            docx_bytes = generate_docx_report(
+            pdf_bytes = generate_pdf_report(
                 dataset_label=dataset_label,
                 summary=summary,
                 results=results,
@@ -652,14 +671,15 @@ with col_exp1:
                 interpretation=saved_interp,
             )
         st.download_button(
-            "⬇️ Download Report (DOCX)",
-            data=docx_bytes,
-            file_name="genelens_report.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "⬇️ Download Report (PDF)",
+            data=pdf_bytes,
+            file_name="genelens_report.pdf",
+            mime="application/pdf",
         )
 with col_exp2:
     st.markdown(
-        "<small style='color:#6B7280'>Opens in Microsoft Word / Google Docs · includes charts as images and full tables</small>",
+        "<small style='color:#6B7280'>Print-ready PDF · includes charts as high-res images and full tables · "
+        "each chart can also be downloaded individually as PNG above</small>",
         unsafe_allow_html=True
     )
 
