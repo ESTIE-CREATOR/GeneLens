@@ -537,6 +537,7 @@ if _looks_like_symbols:
     if run_enrichment:
         with st.spinner("Running GO and KEGG enrichment via Enrichr..."):
             enr_results = cached_pathway_enrichment(results)
+        st.session_state["enr_results"] = enr_results
 
         if enr_results["success"]:
             st.success(
@@ -669,6 +670,7 @@ with col_exp1:
                 fig_pca=fig_pca,
                 fig_bar=fig_bar,
                 interpretation=saved_interp,
+                enr_results=st.session_state.get("enr_results"),
             )
         st.download_button(
             "⬇️ Download Report (PDF)",

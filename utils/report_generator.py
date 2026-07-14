@@ -9,29 +9,39 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle, PageBreak
+from utils.pathway_enrichment import plot_go_bar, plot_kegg_bar
 
 ACCENT = colors.HexColor("#7C6AF7")
 DARK = colors.HexColor("#1a1d27")
 MUTED = colors.HexColor("#6b7280")
 FOOTER_COLOR = colors.HexColor("#374151")
+ERROR_COLOR_HEX = "#c0392b"
 
 _styles = getSampleStyleSheet()
 _TITLE = ParagraphStyle("GLTitle", parent=_styles["Title"], textColor=ACCENT)
 _H2 = ParagraphStyle("GLH2", parent=_styles["Heading2"], textColor=ACCENT, spaceBefore=14)
+_H3 = ParagraphStyle("GLH3", parent=_styles["Heading3"], textColor=ACCENT, spaceBefore=10)
 _META = ParagraphStyle("GLMeta", parent=_styles["Normal"], textColor=MUTED, fontSize=9)
 _NOTE = ParagraphStyle("GLNote", parent=_styles["Normal"], alignment=TA_CENTER, fontSize=9, textColor=MUTED)
 _FOOTER = ParagraphStyle("GLFooter", parent=_styles["Normal"], alignment=TA_CENTER, textColor=FOOTER_COLOR)
+_CELL = ParagraphStyle("GLCell", parent=_styles["Normal"], fontSize=8, leading=10)
 
 
-def _fig_to_image(fig, width_in: float, w_px: int = 900, h_px: int = 500):
+def _add_chart(story: list, fig, width_in: float, w_px: int = 900, h_px: int = 500):
+    """Append a chart image to the story, or a visible error note if rendering fails."""
     if fig is None:
-        return None
+        story.append(Paragraph("Not available.", _styles["Normal"]))
+        return
     try:
         png = pio.to_image(fig, format="png", width=w_px, height=h_px, scale=2)
-    except Exception:
-        return None
+    except Exception as e:
+        story.append(Paragraph(
+            f'<font color="{ERROR_COLOR_HEX}">Chart could not be rendered: {escape(str(e))[:200]}</font>',
+            _styles["Normal"],
+        ))
+        return
     height_in = width_in * (h_px / w_px)
-    return Image(io.BytesIO(png), width=width_in * inch, height=height_in * inch)
+    story.append(Image(io.BytesIO(png), width=width_in * inch, height=height_in * inch))
 
 
 def _summary_table(summary: dict, ml_results: dict) -> Table:
@@ -72,6 +82,26 @@ def _deg_table(top_degs: pd.DataFrame) -> Table:
     return t
 
 
+def _enrichment_table(df: pd.DataFrame) -> Table:
+    rows = [["Term", "Overlap", "Adjusted P-value"]]
+    for _, r in df.head(15).iterrows():
+        rows.append([
+            Paragraph(escape(str(r["Term"])), _CELL),
+            str(r["Overlap"]),
+            f"{r['Adjusted P-value']:.2e}",
+        ])
+    t = Table(rows, hAlign="LEFT", repeatRows=1, colWidths=[4.2 * inch, 1.1 * inch, 1.4 * inch])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), DARK),
+        ("TEXTCOLOR", (0, 0), (-1, 0), ACCENT),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#dddddd")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f5f5f7")]),
+    ]))
+    return t
+
+
 def generate_pdf_report(
     dataset_label: str,
     summary: dict,
@@ -83,6 +113,7 @@ def generate_pdf_report(
     fig_pca,
     fig_bar,
     interpretation: str = "",
+    enr_results: dict | None = None,
 ) -> bytes:
     now = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
     buf = io.BytesIO()
@@ -101,33 +132,21 @@ def generate_pdf_report(
         Paragraph("Differential Expression", _H2),
     ]
 
-    img = _fig_to_image(fig_volcano, width_in=6.5, w_px=900, h_px=500)
-    if img:
-        story.append(img)
-    img = _fig_to_image(fig_bar, width_in=3.5, w_px=420, h_px=380)
-    if img:
-        story.append(img)
+    _add_chart(story, fig_volcano, width_in=6.5, w_px=900, h_px=500)
+    _add_chart(story, fig_bar, width_in=3.5, w_px=420, h_px=380)
 
     story.append(Paragraph("Heatmap — Top DE Genes", _H2))
-    img = _fig_to_image(fig_heatmap, width_in=6.5, w_px=900, h_px=600)
-    if img:
-        story.append(img)
+    _add_chart(story, fig_heatmap, width_in=6.5, w_px=900, h_px=600)
 
     story.append(Paragraph("PCA — Sample Clustering", _H2))
     if fig_pca is not None:
-        img = _fig_to_image(fig_pca, width_in=5.5, w_px=700, h_px=480)
-        if img:
-            story.append(img)
+        _add_chart(story, fig_pca, width_in=5.5, w_px=700, h_px=480)
     else:
         story.append(Paragraph("PCA not available (need ≥2 samples per group).", _styles["Normal"]))
 
     story.append(Paragraph("Machine Learning Classification", _H2))
-    img = _fig_to_image(ml_results.get("roc_fig"), width_in=4.0, w_px=500, h_px=420)
-    if img:
-        story.append(img)
-    img = _fig_to_image(ml_results.get("importance_fig"), width_in=4.5, w_px=600, h_px=480)
-    if img:
-        story.append(img)
+    _add_chart(story, ml_results.get("roc_fig"), width_in=4.0, w_px=500, h_px=420)
+    _add_chart(story, ml_results.get("importance_fig"), width_in=4.5, w_px=600, h_px=480)
     story.append(Paragraph(
         f"Cross-Validation AUC: {ml_results['accuracy']:.3f} ± {ml_results['std']:.3f} "
         f"&nbsp;|&nbsp; Features: {ml_results['n_features']} genes",
@@ -137,6 +156,22 @@ def generate_pdf_report(
     story.append(PageBreak())
     story.append(Paragraph("Top DE Genes", _H2))
     story.append(_deg_table(top_degs))
+
+    go_df = (enr_results or {}).get("go_results")
+    kegg_df = (enr_results or {}).get("kegg_results")
+    if (go_df is not None and not go_df.empty) or (kegg_df is not None and not kegg_df.empty):
+        story.append(PageBreak())
+        story.append(Paragraph("Pathway Enrichment — GO & KEGG", _H2))
+        if go_df is not None and not go_df.empty:
+            story.append(Paragraph("GO Biological Process", _H3))
+            _add_chart(story, plot_go_bar(go_df), width_in=6.5, w_px=900, h_px=480)
+            story.append(Spacer(1, 6))
+            story.append(_enrichment_table(go_df))
+        if kegg_df is not None and not kegg_df.empty:
+            story.append(Paragraph("KEGG Pathways", _H3))
+            _add_chart(story, plot_kegg_bar(kegg_df), width_in=6.5, w_px=900, h_px=480)
+            story.append(Spacer(1, 6))
+            story.append(_enrichment_table(kegg_df))
 
     if interpretation:
         story.append(Spacer(1, 14))
