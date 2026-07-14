@@ -26,6 +26,26 @@ _NOTE = ParagraphStyle("GLNote", parent=_styles["Normal"], alignment=TA_CENTER, 
 _FOOTER = ParagraphStyle("GLFooter", parent=_styles["Normal"], alignment=TA_CENTER, textColor=FOOTER_COLOR)
 _CELL = ParagraphStyle("GLCell", parent=_styles["Normal"], fontSize=8, leading=10)
 
+_chrome_checked = False
+
+
+def ensure_kaleido_chrome():
+    """
+    Kaleido 1.x ships no browser — it needs Chrome for Testing downloaded once
+    into its cache dir. Servers like Streamlit Cloud don't have Chrome installed,
+    so without this every chart export fails. Safe to call repeatedly; only
+    downloads on the first call per process.
+    """
+    global _chrome_checked
+    if _chrome_checked:
+        return
+    _chrome_checked = True
+    try:
+        import kaleido
+        kaleido.get_chrome_sync()
+    except Exception:
+        pass
+
 
 def _add_chart(story: list, fig, width_in: float, w_px: int = 900, h_px: int = 500):
     """Append a chart image to the story, or a visible error note if rendering fails."""
@@ -115,6 +135,7 @@ def generate_pdf_report(
     interpretation: str = "",
     enr_results: dict | None = None,
 ) -> bytes:
+    ensure_kaleido_chrome()
     now = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
     buf = io.BytesIO()
     doc = SimpleDocTemplate(

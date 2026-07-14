@@ -1,5 +1,29 @@
+import time
 import pandas as pd
 import numpy as np
+
+
+def _enrichr_with_retry(gene_list, gene_sets, organism, max_retries: int = 3, base_delay: float = 3.0):
+    """Enrichr's free API rate-limits (HTTP 429) under bursty use — retry with backoff."""
+    import gseapy as gp
+
+    last_err = None
+    for attempt in range(max_retries):
+        try:
+            return gp.enrichr(
+                gene_list=gene_list,
+                gene_sets=gene_sets,
+                organism=organism,
+                outdir=None,
+                verbose=False,
+            )
+        except Exception as e:
+            last_err = e
+            if "429" in str(e) and attempt < max_retries - 1:
+                time.sleep(base_delay * (attempt + 1))
+                continue
+            raise
+    raise last_err
 
 
 def run_pathway_enrichment(results: pd.DataFrame) -> dict:
@@ -21,23 +45,13 @@ def run_pathway_enrichment(results: pd.DataFrame) -> dict:
         if len(all_de_genes) < 3:
             return {"go_results": pd.DataFrame(), "kegg_results": pd.DataFrame(), "success": False, "error": "Not enough DE genes for enrichment (need at least 3)"}
 
-        go_enr = gp.enrichr(
-            gene_list=all_de_genes,
-            gene_sets=["GO_Biological_Process_2021"],
-            organism="human",
-            outdir=None,
-            verbose=False,
-        )
+        go_enr = _enrichr_with_retry(all_de_genes, ["GO_Biological_Process_2021"], "human")
         go_df = go_enr.results.copy()
         go_df = go_df[go_df["Adjusted P-value"] < 0.05].sort_values("Adjusted P-value").head(15)
 
-        kegg_enr = gp.enrichr(
-            gene_list=all_de_genes,
-            gene_sets=["KEGG_2021_Human"],
-            organism="human",
-            outdir=None,
-            verbose=False,
-        )
+        time.sleep(1.5)  # avoid tripping Enrichr's rate limit on the second call
+
+        kegg_enr = _enrichr_with_retry(all_de_genes, ["KEGG_2021_Human"], "human")
         kegg_df = kegg_enr.results.copy()
         kegg_df = kegg_df[kegg_df["Adjusted P-value"] < 0.05].sort_values("Adjusted P-value").head(15)
 
