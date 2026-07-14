@@ -69,21 +69,42 @@ def render_chart_png(fig, width: int = 900, height: int = 500, scale: float = 2)
     )
 
 
-def _add_chart(story: list, fig, width_in: float, w_px: int = 900, h_px: int = 500):
-    """Append a chart image to the story, or a visible error note if rendering fails."""
+def _chart_flowable(fig, width_in: float, w_px: int = 900, h_px: int = 500, not_available_msg: str = "Not available."):
+    """Return a single flowable for a chart: the image, or a visible error/reason note."""
     if fig is None:
-        story.append(Paragraph("Not available.", _styles["Normal"]))
-        return
+        return Paragraph(not_available_msg, _NOTE)
     try:
         png = render_chart_png(fig, width=w_px, height=h_px, scale=2)
     except Exception as e:
-        story.append(Paragraph(
+        return Paragraph(
             f'<font color="{ERROR_COLOR_HEX}">Chart could not be rendered: {escape(str(e))[:200]}</font>',
             _styles["Normal"],
-        ))
-        return
+        )
     height_in = width_in * (h_px / w_px)
-    story.append(Image(io.BytesIO(png), width=width_in * inch, height=height_in * inch))
+    img = Image(io.BytesIO(png), width=width_in * inch, height=height_in * inch)
+    img.hAlign = "CENTER"
+    return img
+
+
+def _add_chart(story: list, fig, width_in: float, w_px: int = 900, h_px: int = 500, not_available_msg: str = "Not available."):
+    """Append a chart image to the story (centered, with breathing room), or a visible error note."""
+    story.append(_chart_flowable(fig, width_in, w_px, h_px, not_available_msg))
+    story.append(Spacer(1, 14))
+
+
+def _side_by_side(story: list, left, right, col_widths=(3.6 * inch, 3.1 * inch)):
+    """Lay two chart flowables out side by side in a borderless table, with a spacer after."""
+    t = Table([[left, right]], colWidths=list(col_widths), hAlign="LEFT")
+    t.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    story.append(t)
+    story.append(Spacer(1, 14))
 
 
 def _summary_table(summary: dict, ml_results: dict) -> Table:
@@ -172,29 +193,45 @@ def generate_pdf_report(
         Spacer(1, 12),
         Paragraph("Summary", _H2),
         _summary_table(summary, ml_results),
+        Spacer(1, 10),
         Paragraph("Differential Expression", _H2),
     ]
 
-    _add_chart(story, fig_volcano, width_in=6.5, w_px=900, h_px=500)
-    _add_chart(story, fig_bar, width_in=3.5, w_px=420, h_px=380)
+    _side_by_side(
+        story,
+        _chart_flowable(fig_volcano, width_in=4.0, w_px=900, h_px=500),
+        _chart_flowable(fig_bar, width_in=2.7, w_px=420, h_px=380),
+    )
 
     story.append(Paragraph("Heatmap — Top DE Genes", _H2))
     _add_chart(story, fig_heatmap, width_in=6.5, w_px=900, h_px=600)
 
     story.append(Paragraph("PCA — Sample Clustering", _H2))
-    if fig_pca is not None:
-        _add_chart(story, fig_pca, width_in=5.5, w_px=700, h_px=480)
-    else:
-        story.append(Paragraph("PCA not available (need ≥2 samples per group).", _styles["Normal"]))
+    _add_chart(story, fig_pca, width_in=5.5, w_px=700, h_px=480,
+               not_available_msg="PCA not available (need ≥2 samples per group).")
 
     story.append(Paragraph("Machine Learning Classification", _H2))
-    _add_chart(story, ml_results.get("roc_fig"), width_in=4.0, w_px=500, h_px=420)
-    _add_chart(story, ml_results.get("importance_fig"), width_in=4.5, w_px=600, h_px=480)
-    story.append(Paragraph(
-        f"Cross-Validation AUC: {ml_results['accuracy']:.3f} ± {ml_results['std']:.3f} "
-        f"&nbsp;|&nbsp; Features: {ml_results['n_features']} genes",
-        _NOTE,
-    ))
+    if ml_results.get("roc_fig") is not None:
+        _side_by_side(
+            story,
+            _chart_flowable(ml_results.get("roc_fig"), width_in=3.6, w_px=500, h_px=420),
+            _chart_flowable(ml_results.get("importance_fig"), width_in=3.1, w_px=600, h_px=480),
+        )
+        story.append(Paragraph(
+            f"Cross-Validation AUC: {ml_results['accuracy']:.3f} ± {ml_results['std']:.3f} "
+            f"&nbsp;|&nbsp; Features: {ml_results['n_features']} genes",
+            _NOTE,
+        ))
+    else:
+        ml_error = ml_results.get("error")
+        if ml_error:
+            story.append(Paragraph(
+                f'<font color="{ERROR_COLOR_HEX}">ML classification did not run: {escape(str(ml_error))[:300]}</font>',
+                _styles["Normal"],
+            ))
+        else:
+            story.append(Paragraph("ML classification not available.", _NOTE))
+    story.append(Spacer(1, 10))
 
     story.append(PageBreak())
     story.append(Paragraph("Top DE Genes", _H2))

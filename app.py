@@ -482,7 +482,8 @@ try:
 except Exception as _ml_err:
     st.warning(f"ML classification could not run: {_ml_err}")
     ml_results = {"accuracy": 0.0, "std": 0.0, "n_features": 0, "roc_auc": 0.0,
-                  "feature_importances": pd.DataFrame({"Gene": [], "Importance": []})}
+                  "feature_importances": pd.DataFrame({"Gene": [], "Importance": []}),
+                  "error": str(_ml_err)}
 
 st.markdown(f"""
 <div style='text-align:center; padding:0.8rem; background:rgba(124,106,247,0.08); border-radius:8px; font-family:Space Mono,monospace; color:#D1D5DB; font-size:0.85rem;'>

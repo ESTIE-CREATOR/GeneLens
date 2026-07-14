@@ -34,6 +34,12 @@ def run_ml_classification(
     Returns:
         dict with: accuracy, std, feature_importances, roc_fig, cv_scores
     """
+    # Dedupe gene index first — a duplicated symbol makes df.loc[gene] return
+    # multiple rows for one requested label, which silently inflates the
+    # feature matrix beyond len(sig_genes) and breaks it downstream.
+    if df.index.duplicated().any():
+        df = df.groupby(df.index).mean()
+
     # Select top DE genes as features, filtering to genes present in df
     sig_genes = results[results["significance"] != "Not significant"]["Gene"].head(top_n_features).tolist()
     if len(sig_genes) < 5:
