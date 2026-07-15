@@ -92,14 +92,21 @@ def _add_chart(story: list, fig, width_in: float, w_px: int = 900, h_px: int = 5
     story.append(Spacer(1, 14))
 
 
-def _side_by_side(story: list, left, right, col_widths=(3.6 * inch, 3.1 * inch)):
-    """Lay two chart flowables out side by side in a borderless table, with a spacer after."""
-    t = Table([[left, right]], colWidths=list(col_widths), hAlign="LEFT")
+def _side_by_side(story: list, left, right, left_width_in: float, right_width_in: float, gap_in: float = 0.3):
+    """
+    Lay two chart flowables side by side with a guaranteed visible gap.
+
+    Column widths are derived from the actual image widths (not assumed) so the
+    gap can't be silently eaten by a chart that's wider than a hardcoded column.
+    """
+    gap_pt = gap_in * inch
+    t = Table([[left, right]], colWidths=[left_width_in * inch + gap_pt, right_width_in * inch], hAlign="LEFT")
     t.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 4),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (0, -1), gap_pt),
+        ("RIGHTPADDING", (1, 0), (1, -1), 0),
         ("TOPPADDING", (0, 0), (-1, -1), 0),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
     ]))
@@ -201,6 +208,7 @@ def generate_pdf_report(
         story,
         _chart_flowable(fig_volcano, width_in=4.0, w_px=900, h_px=500),
         _chart_flowable(fig_bar, width_in=2.7, w_px=420, h_px=380),
+        left_width_in=4.0, right_width_in=2.7,
     )
 
     story.append(Paragraph("Heatmap — Top DE Genes", _H2))
@@ -216,6 +224,7 @@ def generate_pdf_report(
             story,
             _chart_flowable(ml_results.get("roc_fig"), width_in=3.6, w_px=500, h_px=420),
             _chart_flowable(ml_results.get("importance_fig"), width_in=3.1, w_px=600, h_px=480),
+            left_width_in=3.6, right_width_in=3.1,
         )
         story.append(Paragraph(
             f"Cross-Validation AUC: {ml_results['accuracy']:.3f} ± {ml_results['std']:.3f} "
