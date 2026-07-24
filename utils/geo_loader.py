@@ -53,7 +53,13 @@ def fetch_geo_dataset(accession: str, cache_dir: str = _GEO_CACHE) -> tuple:
         )
 
     gse = GEOparse.get_GEO(geo=accession, destdir=cache_dir, silent=True)
-    expr = gse.pivot_samples("VALUE")
+    try:
+        expr = gse.pivot_samples("VALUE")
+    except (KeyError, ValueError):
+        # RNA-seq datasets often have empty per-sample GSM tables (counts live
+        # only in a GSE-level supplementary matrix file instead) — pivot_samples
+        # crashes on these rather than returning an empty frame.
+        expr = pd.DataFrame()
 
     if expr.empty:
         raise ValueError(
