@@ -25,8 +25,28 @@ A complete bioinformatics pipeline — from raw RNA-seq count matrices to pathwa
 | ML Classification | Random Forest (200 trees, 5-fold CV, AUC + feature importance) |
 | AI Interpretation | Anthropic Claude API — automated biological interpretation |
 
-> GO and KEGG enrichment works for datasets with real gene names (e.g. SOD2, TP53).
-> Large Ensembl ID datasets are gracefully skipped with a helpful message.
+> GO and KEGG enrichment works for datasets with real gene names (e.g. SOD2, TP53) —
+> or IDs GeneLens can map to gene symbols automatically (see below).
+
+---
+
+## Gene ID Mapping (New in v1.0)
+
+Uploaded or GEO-fetched datasets aren't always keyed by HGNC gene symbol — RNA-seq
+pipelines commonly output Ensembl gene IDs (`ENSG...`), and some platforms use Entrez,
+RefSeq, or UniProt IDs instead. GeneLens now detects the ID format automatically and
+maps it to HGNC symbols using two local, static reference tables (no network calls at
+analysis time):
+
+- **`hgnc_mapping.tsv`** — NCBI `gene_info`, covering **193,877 genes** with Ensembl,
+  Entrez, RefSeq, and UniProt cross-references
+- **`ensembl_to_symbol.tsv`** — a BioMart supplement (**49,132 entries**) filling in
+  lncRNA and other non-coding genes NCBI's table misses
+
+This is what lets a raw Ensembl-ID RNA-seq matrix (see the COVID-19 dataset below,
+60,683 raw IDs) get GO/KEGG enrichment at all — the mapping step happens automatically
+before differential expression, and the app reports how many genes mapped vs. were
+dropped.
 
 ---
 
@@ -34,12 +54,16 @@ A complete bioinformatics pipeline — from raw RNA-seq count matrices to pathwa
 
 ### Dataset 1 — COVID-19 PBMC RNA-seq (GSE152418, *Science* 2020)
 
-**Scale:** 60,683 genes × 34 samples | 17 COVID-19 patients vs. 17 healthy controls
+**Scale:** 44,242 genes × 34 samples | 17 COVID-19 patients vs. 17 healthy controls
+
+> GEO's raw matrix ships 60,683 Ensembl gene IDs. GeneLens maps Ensembl → HGNC symbols
+> automatically (see [Gene ID Mapping](#gene-id-mapping-new-in-v10) above); after
+> dropping unmapped and duplicate IDs, 44,242 genes remain for analysis.
 
 <!-- Add your COVID volcano screenshot URL here -->
 <img width="959" height="474" alt="Image" src="https://github.com/user-attachments/assets/c3f17865-3161-43f2-b139-e6a2688458e9" />
 
-*3,405 upregulated · 2,250 downregulated*
+*3,200 upregulated · 2,216 downregulated*
 
 <img width="959" height="476" alt="Image" src="https://github.com/user-attachments/assets/fd47d0de-f499-4f62-9faf-d3c58d4ca24a" />
 
@@ -67,7 +91,7 @@ A complete bioinformatics pipeline — from raw RNA-seq count matrices to pathwa
 
 <img width="1919" height="943" alt="Image" src="https://github.com/user-attachments/assets/1f415041-4918-4d2a-932d-954a9172ff04" />
 
-*Glutathione metabolic process — most significantly depleted GO term*
+*Glutathione metabolic process — enriched among downregulated genes*
 
 <img width="1919" height="948" alt="Image" src="https://github.com/user-attachments/assets/e79afb9c-c05f-4051-a77d-dbd09504edc8" />
 
@@ -76,7 +100,7 @@ A complete bioinformatics pipeline — from raw RNA-seq count matrices to pathwa
 - `GPX1`, `GCLM`, `GSR` downregulated — antioxidant suppression
 - `SOD2`, `CAT` strong downward trends — consistent with thesis biochemical findings
 - `CYP2E1` upregulated → ROS generation
-- **Top GO term:** Glucose homeostasis (GO:0042593, p=6.00e-07)
+- **Top GO term:** Glucose homeostasis (GO:0042593)
 - **Top KEGG pathway:** Insulin signalling (p=1.86e-08)
 
 > 📁 Full case study and methods: [genelens-t2dm-study](https://github.com/ESTIE-CREATOR/genelens-t2dm-study)
@@ -115,16 +139,24 @@ Opens at `http://localhost:8501`
 
 ```
 GeneLens/
-├── app.py                      ← Main Streamlit application
+├── app.py                      ← Main Streamlit app (incl. count-matrix file parsing)
 ├── requirements.txt
+├── packages.txt                ← apt deps (Chromium, for chart/PDF export on Streamlit Cloud)
+├── runtime.txt / .python-version
+├── LICENSE · CITATION.cff
 ├── .streamlit/config.toml      ← Dark theme
+├── data/
+│   ├── hgnc_mapping.tsv        ← NCBI gene_info: Ensembl/Entrez/RefSeq/UniProt → HGNC symbol
+│   └── ensembl_to_symbol.tsv   ← BioMart supplement (lncRNA / non-coding genes)
 └── utils/
     ├── de_analysis.py          ← Welch t-test + BH FDR
+    ├── gene_mapper.py          ← Detects & maps gene IDs to HGNC symbols
+    ├── geo_loader.py           ← NCBI GEO fetch (GSM tables + supplementary-matrix fallback)
     ├── visualisations.py       ← Volcano, heatmap, PCA, bar chart
     ├── ml_classifier.py        ← Random Forest + ROC curve
     ├── pathway_enrichment.py   ← GO and KEGG via Enrichr API
     ├── ai_interpretation.py    ← Claude API interpretation
-    ├── file_parser.py          ← GEO Series Matrix + CSV/TSV parser
+    ├── report_generator.py     ← PDF report export (charts, tables, AI interpretation)
     └── data_generator.py       ← Demo dataset generator
 ```
 
