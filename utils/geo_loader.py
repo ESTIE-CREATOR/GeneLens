@@ -1,9 +1,18 @@
 import os
+import io
+import gzip
 import tempfile
 import pandas as pd
 import numpy as np
+import requests
 
 _GEO_CACHE = os.path.join(tempfile.gettempdir(), "genelens_geo_cache")
+
+_MATRIX_KEYWORDS = ("count", "matrix", "fpkm", "tpm", "expression", "raw")
+_SKIP_KEYWORDS = (
+    "filelist", "readme", ".tar", ".pdf", ".xlsx", ".xls",
+    ".bam", ".bai", ".bw", ".bigwig", ".idat", ".cel",
+)
 
 EXAMPLE_DATASETS = [
     {
@@ -25,6 +34,54 @@ EXAMPLE_DATASETS = [
         "data_type": "rnaseq",
     },
 ]
+
+
+def _candidate_supplementary_urls(gse) -> list:
+    """Rank a GSE's supplementary files by how likely they are to be a counts/expression matrix."""
+    urls = gse.metadata.get("supplementary_file", [])
+    if isinstance(urls, str):
+        urls = [urls]
+    candidates = [u for u in urls if not any(s in u.lower() for s in _SKIP_KEYWORDS)]
+    candidates.sort(key=lambda u: sum(kw in u.lower() for kw in _MATRIX_KEYWORDS), reverse=True)
+    return candidates
+
+
+def _download_and_parse_matrix(url: str):
+    """Download one supplementary file and try to parse it as a genes × samples matrix."""
+    https_url = url.replace("ftp://", "https://", 1)
+    try:
+        resp = requests.get(https_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=120)
+        resp.raise_for_status()
+        raw = resp.content
+    except Exception:
+        return None
+
+    if https_url.lower().endswith(".gz"):
+        try:
+            raw = gzip.decompress(raw)
+        except OSError:
+            return None
+
+    text = raw.decode("utf-8", errors="replace")
+    for sep in ("\t", ","):
+        try:
+            df = pd.read_csv(io.StringIO(text), sep=sep, index_col=0)
+        except Exception:
+            continue
+        if df.shape[1] >= 1 and df.shape[0] > 1:
+            numeric = df.apply(pd.to_numeric, errors="coerce")
+            if numeric.notna().mean().mean() > 0.9:
+                return numeric
+    return None
+
+
+def _fetch_supplementary_matrix(gse):
+    """Fall back to a GSE-level supplementary counts matrix when per-sample GSM tables are empty."""
+    for url in _candidate_supplementary_urls(gse):
+        df = _download_and_parse_matrix(url)
+        if df is not None:
+            return df
+    return None
 
 
 def fetch_geo_dataset(accession: str, cache_dir: str = _GEO_CACHE) -> tuple:
@@ -60,6 +117,13 @@ def fetch_geo_dataset(accession: str, cache_dir: str = _GEO_CACHE) -> tuple:
         # only in a GSE-level supplementary matrix file instead) — pivot_samples
         # crashes on these rather than returning an empty frame.
         expr = pd.DataFrame()
+
+    if expr.empty:
+        # RNA-seq series often store counts only in a GSE-level supplementary
+        # matrix file rather than per-GSM tables — try downloading that instead.
+        fallback = _fetch_supplementary_matrix(gse)
+        if fallback is not None:
+            expr = fallback
 
     if expr.empty:
         raise ValueError(

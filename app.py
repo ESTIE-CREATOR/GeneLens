@@ -308,6 +308,21 @@ if data_source == "🌐 GEO Database":
             df, sample_info, is_counts = cached_fetch_geo(active_accession.strip().upper())
             if not already_log2 and is_counts:
                 pass  # raw counts — DE analysis will log2-transform
+            df_mapped, _gene_id_type, _map_stats = map_to_gene_symbol(df)
+            if _gene_id_type is not None:
+                if _map_stats["n_mapped"] > 0:
+                    st.info(
+                        f"Detected **{_gene_id_type.replace('_', ' ')}** IDs — "
+                        f"mapped {_map_stats['n_mapped']:,} genes to HGNC symbols "
+                        f"({_map_stats['n_dropped']:,} dropped, no match in local table)."
+                    )
+                    df = df_mapped
+                else:
+                    st.warning(
+                        f"Detected **{_gene_id_type.replace('_', ' ')}** IDs but none matched "
+                        "the local gene symbol table. GO/KEGG enrichment will be unavailable. "
+                        "DE analysis will proceed with the original IDs."
+                    )
             dataset_label = f"**{active_accession}** — {len(df):,} genes × {len(df.columns)} samples"
         except Exception as exc:
             st.error(f"Could not load {active_accession}: {exc}")
